@@ -475,3 +475,66 @@ def add_number_legend(ax, string):
     lines.append(dummy_line)
     labels.append(string)
     return lines, labels
+
+
+
+
+#======================================
+#TEST - figuring out plotting
+#======================================
+
+def hist_test(y_true, y_pred, target_map, normalize=True, single_legend=False, **kwargs):
+    # create a figure with subplots for each node, where the score is shown
+    # nodes are defined over target_map order
+
+    fig, axes = plt.subplots(1,len(target_map), figsize=(8 * len(target_map), 8))
+    fig.suptitle(kwargs.pop("title", None))
+    weight = None
+    # get events that are predicted correctly for each class
+    for node, node_idx in target_map.items():
+        for data_cls, data_idx in target_map.items():
+            y_label = "frequency"
+
+            if not normalize:
+                axes[node_idx].set_yscale("log")
+                axes[node_idx].set_ylim(top=len(y_pred))
+            else:
+                axes[node_idx].set_yscale("linear")
+                axes[node_idx].set_ylim(top=1.)
+                y_label += " normalized"
+
+            axes[node_idx].set_xlabel(f"{node} node", )
+            axes[node_idx].set_ylabel(y_label)
+            axes[node_idx].grid()
+
+
+            # get events of specific cls (e.g. hh)
+            correct_cls_mask = y_true[:, data_idx] == 1
+            # get predictions for cls
+            filtered_predictions = y_pred[correct_cls_mask][:, node_idx]
+
+            if normalize:
+                weight = np.full(filtered_predictions.shape, 1 / len(filtered_predictions))
+
+            _ = axes[node_idx].hist(
+                filtered_predictions,
+                bins=kwargs.get("bins", 20),
+                histtype=kwargs.get("histtype", "step"),
+                alpha=kwargs.get("alpha", 0.7),
+                label=data_cls,
+                weights=weight,
+                **kwargs,
+        )
+        if not single_legend:
+            axes[node_idx].legend()
+    if single_legend:
+        lines_labels = [fig.axes[0].get_legend_handles_labels()]
+        lines, labels = [sum(lol, []) for lol in zip(*lines_labels)]
+        fig.legend(lines, labels)
+    return fig, axes
+
+#plot in train.py aufrufen
+
+
+
+

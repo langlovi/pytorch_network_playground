@@ -142,7 +142,7 @@ class TrainingConfig:
     train_ratio: float = 0.75 # split ratio for k-fold data into train and validation
     t_batch_size: int = 4096 * 10
     v_batch_size: int = -1 # validation batch size, -1 = full set,
-    save_model_name: str = "parametrized_binning" # name of the model used to save
+    save_model_name: str = "test_vincent" # name of the model used to save
 
     # Sampler Settings
     sample_ratio: Dict[str, float] = field(default_factory=lambda:{"dy": 1 / 3, "tt": 1 / 3, "hh": 1 / 3}) # decide the ratio of tt, dy and hh within a batch

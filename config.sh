@@ -1,5 +1,5 @@
 # storage directories, all directories are created for your
-export USER=wiedersb
+export USER=langlovi
 export STORE_DIR=/data/dust/user/${USER}/HH_DNN # ROOT of storage
 export CACHE_DIR=${STORE_DIR}/cache # directory where preprocessed data is stored as well as dataset paths
 export PICTURE_DIR=${STORE_DIR}/pictures
@@ -19,10 +19,10 @@ export INPUT_DATA_DIR="${TRAINING_ROOT}/${ERA}"
 
 
 # virtualenv handling
-export VENV_MODE="venv" # decide which venv is used - possible values: pyenv, venv or cf
+export VENV_MODE="cf" # decide which venv is used - possible values: pyenv, venv or cf
 
 # columnflow settings, only necessary if VENV_MDOE is set to cf
-export CF_ROOT="/afs/desy.de/user/w/wiedersb/xxl/hh2bbtautau_analyze" # your root directory of CF
+export CF_ROOT="/afs/desy.de/user/l/langlovi/hh2bbtautau" # your root directory of CF
 export CF_USER_FLAVOR="dev" # your cf user name - used when source setup with for example 'dev'
 export CF_SANDBOX="venv_hbt_dev" #  sandbox name within columnflow
 
