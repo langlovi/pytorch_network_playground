@@ -142,14 +142,14 @@ class TrainingConfig:
     train_ratio: float = 0.75 # split ratio for k-fold data into train and validation
     t_batch_size: int = 4096 * 10
     v_batch_size: int = -1 # validation batch size, -1 = full set,
-    save_model_name: str = "test_vincent" # name of the model used to save
+    save_model_name: str = "reweighted_process_id:doubled_tau_weights" # name of the model used to save
 
     # Sampler Settings
     sample_ratio: Dict[str, float] = field(default_factory=lambda:{"dy": 1 / 3, "tt": 1 / 3, "hh": 1 / 3}) # decide the ratio of tt, dy and hh within a batch
     sub_process_ratios: Dict[str, float] = field(default_factory=lambda:{ # decide the
         # HINT: each rate is multiplied together to final rate, e.g. if process id exist 2x with rate 2, final rate is 4
         "signal":{}, # empty categorizes are set to 1 by default
-        "tt":{(1100,1200):1, 1300:1}, # groups are possible, and mixes are allowed
+        "tt":{(1100,1200): 1, 1300: 1}, # groups are possible, and mixes are allowed
         "dy":{51667: 1, 51683: 1, 51664: 1, 51680: 1, 51720: 1, 51723: 1, 51726: 1,
         51729: 1, 51732: 1, 51735: 1, 51674: 1, 51690: 1, 51665: 1, 51681: 1,
         51661: 1, 51677: 1, 51670: 1, 51671: 1, 51672: 1, 51673: 1, 51675: 1,
@@ -157,8 +157,13 @@ class TrainingConfig:
         51699: 1, 51702: 1, 51705: 1, 51708: 1, 51711: 1, 51714: 1, 51693: 1,
         51668: 1, 51684: 1, 51663: 1, 51679: 1,
         },
+        "dy_to_tau":{(51720, 51723, 51726, 51729, 51732, 51735, 51699, 51702, 
+        51705, 51708, 51711, 51714, 51693): 2},
+        "dy_to_e":{(51667, 51664, 51674, 51665, 51661, 51670, 51671, 51672, 51673, 51675, 51666, 51668, 51663): 1 },
+        "dy_to_mu":{(51683, 51680, 51690, 51681, 51677, 51686, 51687, 51688, 51689, 51691, 51682, 51684, 51679): 1},
+
     })
-    use_sub_process_ratios: Tuple[str] = ("signal", "tt", "dy")
+    use_sub_process_ratios: Tuple[str] = ("dy_to_tau",) #muss komma hinten haben
     sample_attributes: Tuple[str, ...] = (
         "continuous",
         "categorical",
