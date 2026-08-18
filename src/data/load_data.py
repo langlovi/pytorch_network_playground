@@ -6,6 +6,7 @@ import awkward as ak
 import numpy as np
 import torch
 import uproot
+import numpy.lib.recfunctions as rfn
 
 from data.cache import DataCacher
 from data.utils import depthCount
@@ -61,6 +62,7 @@ def root_to_numpy(
         "(tau2_isolated == 1)",
         "(leptons_os == 1)",
         "((channel_id == 1) | (channel_id == 2) | (channel_id == 3))",
+        "(reg_dnn_moe_vis_tau2_charge == 1) | (reg_dnn_moe_vis_tau2_charge == -1)",
     ]
 
     if isinstance(cut, str):
@@ -230,7 +232,7 @@ def load_data(datasets, columns: Union[list[str],str, None]=None, cuts: Union[li
     return data
 
 
-def handle_weights_and_convert_to_torch(events: np.array, continuous_features: list[str], categorical_features: list[str], dtype: torch.dtype=None):
+def handle_weights_and_convert_to_torch(events: np.array, continuous_features: list[str], categorical_features: list[str]):
     """
     Calculates final weights, extract masks aswell as extract all *continuous_features* and *categorical_features* from structured numpy array *events*.
     Converts all arrays to torch tensors and returns a dictionary containing these.
@@ -243,11 +245,9 @@ def handle_weights_and_convert_to_torch(events: np.array, continuous_features: l
     """
 
     def filter_nan_mask(array, features, uid):
-        masks = []
+        event_mask = np.zeros(array.size, dtype=np.bool)
         for f in features:
-            mask = np.isnan(array[f])
-            masks.append(mask)
-        event_mask = np.logical_or.reduce(masks)
+            event_mask |= np.isnan(array[f])
         num_filter = np.sum(event_mask)
         if num_filter:
             logger_inst.warning(f"Filtered {num_filter} Nan events from pid {uid}")
@@ -257,7 +257,7 @@ def handle_weights_and_convert_to_torch(events: np.array, continuous_features: l
         arr = events.pop(uid)
 
         # filter all nans out
-        event_mask = filter_nan_mask(arr, continuous_features + categorical_features, uid),
+        event_mask = filter_nan_mask(arr, continuous_features + categorical_features, uid)
         arr = arr[event_mask]
 
         # if resulting tensor is empty just skip
@@ -265,28 +265,30 @@ def handle_weights_and_convert_to_torch(events: np.array, continuous_features: l
             logger_inst.warning(f"Skipping {uid} due to zero elements - which can happen after filtering nans")
             continue
 
-        # combine columns from struct numpy and convert to torch tensor
-        continuous_tensor, categorical_tensor = [
-            torch.from_numpy(np.stack([arr[feature] for feature in features], axis=1))
-            for features in (continuous_features,categorical_features)
-            ]
+        # handle non feature columns first:
+
+        continuous_tensor = struct_to_group_tensor(arr, continuous_features, dtype=torch.float32)
+        categorical_tensor = struct_to_group_tensor(arr, categorical_features, dtype=torch.float32)
+
         # handling weights and convert to torch tensors
         # single numbers cant be converted by using from_numpy thus have to be wrapped in array
-        final_mask = arr["bjet_mask"] & arr["di_tau_mask"] & arr["di_bjet_mask"]
+        masks_tensor = struct_to_group_tensor(arr, ["bjet_mask", "di_tau_mask", "di_bjet_mask"], torch.bool)
+        final_mask = masks_tensor[:, 0] & masks_tensor[:, 1] & masks_tensor[:, 2]
         # total_bjet_weight = torch.tensor(np.sum(arr["combined_weight"][arr["bjet_mask"]]))
         # total_di_tau_weight = torch.tensor(np.sum(arr["combined_weight"][arr["di_tau_mask"]]))
         # total_di_bjet_weight = torch.tensor(np.sum(arr["combined_weight"][arr["di_bjet_mask"]]))
-        total_evaluation_weight = torch.tensor(np.sum(arr["combined_weight"][final_mask]))
+
 
         # some arrays have negative strides for some reason, which torch cannot handle -> cast to contiguous array first
-        normalization_weights = torch.tensor(np.ascontiguousarray(arr["normalization_weight"]), dtype=torch.float32)
+        weights_tensor = struct_to_group_tensor(arr, ["normalization_weight", "combined_weight"], dtype=torch.float32)
+        normalization_weights = weights_tensor[:, 0]
         sum_of_normalization_weights = torch.sum(normalization_weights)
 
-        product_of_all_weights = torch.tensor(np.ascontiguousarray(arr["combined_weight"]), dtype=torch.float32)
+        product_of_all_weights = weights_tensor[:, 1]
         sum_of_combined_weights = torch.sum(product_of_all_weights)
+        total_evaluation_weight = torch.sum(product_of_all_weights[final_mask])
 
-        # event id is a uint and is stored as uncontiguousarray for some reason after the casting
-        event_id = torch.tensor(np.ascontiguousarray(arr["event"]), dtype=torch.int64)
+        event_id = struct_to_group_tensor(arr, ["event"], dtype=torch.int64).flatten()
 
         events[uid] = {
             "continuous": continuous_tensor,
@@ -299,13 +301,14 @@ def handle_weights_and_convert_to_torch(events: np.array, continuous_features: l
             "total_normalization_weights" : sum_of_normalization_weights,
 
             "total_evaluation_weight" : total_evaluation_weight,
-            "evaluation_mask": torch.tensor(final_mask),
+            "evaluation_mask": final_mask,
             "mask" : {
-                "bjet": arr["bjet_mask"],
-                "di_tau": arr["di_tau_mask"],
-                "di_bjet": arr["di_bjet_mask"],
+                "bjet": masks_tensor[:, 0],
+                "di_tau": masks_tensor[:, 1],
+                "di_bjet": masks_tensor[:, 2],
                 },
         }
+        del arr
     return events
 
 
@@ -347,3 +350,23 @@ def get_data(config , _save_cache = False, ignore_cache=False) -> dict[torch.Ten
                 from IPython import embed
                 embed(header=f"{e}\n Saving Cache did not work out - going debugging to manually save \'events\' with \'cacher.save_cache\'")
     return events
+
+
+def struct_to_group_tensor(arr: np.typing.NDArray, fields: tuple[str], dtype: torch.dtype=torch.float32):
+    """
+    Small helper convert struct *arr* *fields* into torch tensor of given *dtype*.
+
+    Args:
+        arr (np.typing.NDArray): structured array
+        fields (tuple[str]): fields one wants to extract
+        dtype (torch.dtype, optional): final dtype. Defaults to torch.float32.
+
+    Returns:
+        torch.Tensor: Tensor of extracted fields in given dtype
+    """
+    # get numpy equivalent dtype
+    np_dtype = torch.empty(0, dtype=dtype).numpy().dtype
+    dense = rfn.structured_to_unstructured(arr[fields], dtype=np_dtype)
+    # some arrays have negative strides for some reason, which torch cannot handle -> cast to contiguous array first
+    dense = np.ascontiguousarray(dense)
+    return torch.from_numpy(dense)

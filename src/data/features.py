@@ -39,6 +39,7 @@ def prefix_map():
     "prod20": "reg_dnn_moe",
     "prod19": "res_dnn_pnet",
     "prod24" : "reg_dnn_moe",
+    "prod27_dyext" : "reg_dnn_moe",
     }
     return stem_to_prefix[stem]
 
@@ -69,7 +70,7 @@ def add_prefix(string, prefix, ignore_code="_"):
 def feature(feature):
     data_prefix = prefix_map()
     feature =  [add_prefix(f, f"{data_prefix}_", ignore_code="_") for f in feature]
-    return tuple(feature)
+    return list(feature)
 
 categorical_features = feature([
         "pair_type",

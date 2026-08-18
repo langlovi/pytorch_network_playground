@@ -121,7 +121,7 @@ class Process(t_data.Dataset):
             number = len(self)
 
         start_idx = self.current_idx
-        # do not drop last, but instead create smaller batch
+        # do not drop last, but instead create smaller 
         next_idx = min(self.current_idx + number, len(self))
         idx = self.indices[start_idx:next_idx]
         self.current_idx = next_idx
@@ -509,7 +509,9 @@ class ProcessSampler(t_data.Sampler):
         # helper to enable ex. validation sampler to get sampling weight from training sampler
         for process_type, processes in self.process_inst.items():
             for uid, process_inst in processes.items():
-                v_process_inst = process_sampler.process_inst[process_type][uid]
+                v_process_inst = process_sampler.process_inst[process_type].get(uid,None)
+                if v_process_inst is None:
+                    continue
                 v_process_inst.relative_weight = process_inst.relative_weight
 
 

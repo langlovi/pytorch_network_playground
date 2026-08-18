@@ -87,6 +87,7 @@ def log_metrics(
 
     # outputs of network
     pred, tar, weights = sampler_output
+    pred, tar, weights = pred.detach().cpu(), tar.detach().cpu(), weights.detach().cpu()
 
     # log crossentropy as metric
     # weights are EVENT WEIGHTS, but cross entropy want to have cls weights
@@ -126,23 +127,36 @@ def log_metrics(
     if _optional("dataset_id", log_name="ProcessID Loss"):
         uids = data["dataset_id"]
 
-        _ids = {
+        grouped_ids = {                         #grouped_ids are plotted in groups
         "hh": (21101,),
         "tt":(1100,1200,1300), # groups are possible, and mixes are allowed
-        "dy":(51667, 51683, 51664, 51680, 51720, 51723, 51726,
-        51729, 51732, 51735, 51674, 51690, 51665, 51681,
-        51661, 51677, 51670, 51671, 51672, 51673, 51675,
-        51686, 51687, 51688, 51689, 51691, 51666, 51682,
-        51699, 51702, 51705, 51708, 51711, 51714, 51693,
-        51668, 51684, 51663, 51679,),
+        "dy2tau":(51720, 51723, 51726, 51729, 51732, 51735, 51699, 51702, 
+        51705, 51708, 51711, 51714, 51693,),
+        "dy2e":(51667, 51664, 51674, 51665, 51661, 51670, 51671, 51672, 
+        51673, 51675, 51666, 51668, 51663),
+        "dy2mu":(51683, 51680, 51690, 51681, 51677, 51686, 51687, 51688, 51689, 
+        51691, 51682, 51684, 51679),
         }
+        single_ids = [] #list(grouped_ids["dy2mu"])  #single_ids are plotted separately
 
-        to_filter = []
-        for _id in _ids.values():
-            to_filter.extend(_id)
 
-        for _id in to_filter:
-            mask = (uids == _id).flatten()
+        all_plots = grouped_ids.copy()
+        for s_id in  single_ids:
+            all_plots[str(s_id)] = (s_id,)
+
+        for group_name, group_ids in all_plots.items():
+            
+            # Wandle das Tupel (die Unterkategorie) in einen Tensor um.
+            # WICHTIG: Er muss auf dem gleichen Gerät (CPU/GPU) liegen wie 'uids'.
+            group_tensor = torch.tensor(group_ids, device=uids.device)
+            
+            # Prüft für jedes Element in 'uids', ob es in 'group_tensor' enthalten ist.
+            mask = torch.isin(uids, group_tensor).flatten()
+
+            # Überspringe die Berechnung, wenn die Maske komplett 'False' ist
+            if not mask.any():
+                continue
+
             masked_pred = pred[mask]
             masked_tar = tar[mask]
             masked_weight = weights[mask]
@@ -152,14 +166,42 @@ def log_metrics(
                 masked_tar,
                 weight=None,
                 reduction="none"
-                )
+            )
 
             cce_pid_weights = masked_weight.reshape(cce_pid_metric.shape)
             cce_pid_weighted_metric = torch.mean(cce_pid_metric * cce_pid_weights)
+            
             tensorboard_inst.log_scalar(
-                values={str(_id): cce_pid_weighted_metric},
+                values={group_name: cce_pid_weighted_metric},
                 step=iteration_step,
-                name=f"{mode} - PID CrossEntropy")
+                name=f"{mode} - PID CrossEntropy"
+            )
+
+
+
+        # to_filter = []
+        # for _id in dy2mu_ids.values():              #ursprünglich _ids.values()
+        #     to_filter.extend(_id)
+
+        # for _id in to_filter:
+        #     mask = (uids == _id).flatten()
+        #     masked_pred = pred[mask]
+        #     masked_tar = tar[mask]
+        #     masked_weight = weights[mask]
+
+        #     cce_pid_metric = torch.nn.functional.cross_entropy(
+        #         masked_pred,
+        #         masked_tar,
+        #         weight=None,
+        #         reduction="none"
+        #         )
+        #     from IPython import embed; embed(header="MESSAGE Line 178 | File: train_utils.py")
+        #     cce_pid_weights = masked_weight.reshape(cce_pid_metric.shape)
+        #     cce_pid_weighted_metric = torch.mean(cce_pid_metric * cce_pid_weights)
+        #     tensorboard_inst.log_scalar(
+        #         values={str(_id): cce_pid_weighted_metric},
+        #         step=iteration_step,
+        #         name=f"{mode} - PID CrossEntropy")
 
 
     if _optional("loss", log_name="Loss"):

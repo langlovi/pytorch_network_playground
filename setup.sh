@@ -154,6 +154,8 @@ prepare_cf(){
     }
 
 activate_cf(){
+    cd /afs/desy.de/user/l/langlovi/pytorch_network_playground
+    PYTHONPATH=$PYTHONPATH:$PWD/src
     echo "Activate cf sandbox at ${CF_SANDBOX}"
     finish_setup
     cf_sandbox "${CF_SANDBOX}"
@@ -240,5 +242,54 @@ setup() {
         return 0
     fi
     }
+
+pdb_on() {
+
+# -----------------------------------------------------------------------------
+# Expands PYTHONPATH by PDB_HOOK_DIR to enable automatic debugging when exception happens.
+# Required variables from config:
+#   PDB_HOOK_DIR         Dir where customizesite.py lies
+# -----------------------------------------------------------------------------
+
+# small recap switch cases:
+# bash switch statement case VALUE in  PATTERN) commands ;; esac
+# VALUE is what is checked, pattern what is looked for
+# ;; ends case block
+# esac, is case backwards
+
+# set variable to change mode of debugger
+local mode="${1:-embed}"
+if [[ "${mode}" != "ipdb" && "${mode}" != "embed" && "${mode}" != "pdb" ]]; then
+    echo "Usage: pdb_on [ipdb|embed|pdb]"
+    return 1
+fi
+
+export PDB_DEBUGGER_MODE="${mode}"
+
+# first: check if PDB_HOOK_DIR already exist in PYTHONPATH, * is any token, when found break
+# second: *) match everything (is basically else)
+case ":$PYTHONPATH:" in
+    *":$PDB_HOOK_DIR:"*)
+        echo "pdb post-mortem hook already enabled"
+        ;;
+    *)
+        export PYTHONPATH="$PDB_HOOK_DIR:$PYTHONPATH"
+        echo "pdb post-mortem hook: ON"
+        ;;
+esac
+}
+
+pdb_off() {
+
+# -----------------------------------------------------------------------------
+# Removed PDB_HOOK_DIR from current PYTHONPATH to disable automatic debugging when exception happens.
+# -----------------------------------------------------------------------------
+
+# sed -e s/PATTERN/REPLACEMENT, using | instead of /, || is replace empty
+# checking 3 cases: start and middle of path, end of path with :, only thing in path.
+export PYTHONPATH="$(echo "$PYTHONPATH" | sed -e "s|$PDB_HOOK_DIR:||" -e "s|:$PDB_HOOK_DIR||" -e "s|^$PDB_HOOK_DIR$||")"
+unset PDB_DEBUGGER_MODE
+echo "pdb post-mortem hook: OFF"
+}
 
 setup "$@"

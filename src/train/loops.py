@@ -250,7 +250,6 @@ class ValidationLoop(BaseLoop):
                     class_pred, loss_pred = self.separate_prediction(pred)
 
                     # -- collect data that is always done --
-
                     collected_data["targets"].append(events.pop("targets"))
                     collected_data["sample_weights"].append(events.pop("sample_weights"))
                     collected_data["relative_weights"].append(

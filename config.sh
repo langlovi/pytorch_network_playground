@@ -6,20 +6,23 @@ export PICTURE_DIR=${STORE_DIR}/pictures
 export MODELS_DIR=${STORE_DIR}/models # saved models
 export TENSORBOARD_DIR=${STORE_DIR}/tensorboard # tensorboard storage
 export EVALUATION_DIR=${STORE_DIR}/evaluation # directory when evaluating outputs
+export DNN=/afs/desy.de/user/l/${USER}/pytorch_network_playground
+export PLOTTING=/afs/desy.de/user/l/${USER}/hbt_dy/plotting
+
 
 # debug level: DEBUG; INFO; WARNING
 export LOG_LEVEL="DEBUG"
 export FILE_LOG_LEVEL="DEBUG"
 
 # location where the input data can be found.
-export ERA=prod20 # possible eras: prod14, prod20, prod24 (20 only has 22pre)
+export ERA=prod27_dyext # possible eras: prod14, prod20, prod24 (20 only has 22pre)
 export TRAINING_ROOT="/data/dust/user/riegerma/hh2bbtautau/run3_training_data" # normal training root
 # export TRAINING_ROOT="/data/dust/user/wiedersb/machine_learning_data" # quintus training root
 export INPUT_DATA_DIR="${TRAINING_ROOT}/${ERA}"
 
 
 # virtualenv handling
-export VENV_MODE="cf" # decide which venv is used - possible values: pyenv, venv or cf
+export VENV_MODE="venv" # decide which venv is used - possible values: pyenv, venv or cf
 
 # columnflow settings, only necessary if VENV_MDOE is set to cf
 export CF_ROOT="/afs/desy.de/user/l/langlovi/hh2bbtautau" # your root directory of CF
@@ -27,9 +30,13 @@ export CF_USER_FLAVOR="dev" # your cf user name - used when source setup with fo
 export CF_SANDBOX="venv_hbt_dev" #  sandbox name within columnflow
 
 # pyenv or virtualenv settings
-export VENV_ROOT="/data/dust/user/${USER}/pyenv_virtualenvs" # place to look for existing virtualenvs
+export VENV_ROOT="/data/dust/user/${USER}/venvs" # place to look for existing virtualenvs
 export PYENV_ROOT="/afs/desy.de/user/w/${USER}/.pyenv" # root of pyenv installation
 export ML_ENV="ml_torch" # name of your virtualenv, so it can be activated by source setup.sh
 
 # flags to stop unnecessary dir checks, can be undone to recreate dirs
 export SETUP_DIRS_DONE=1
+
+export LD_LIBRARY_PATH=/data/dust/user/langlovi/venvs/ml_torch/lib/python3.9/site-packages/nvidia/cudnn/lib:$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=/data/dust/user/langlovi/venvs/ml_torch/lib/python3.9/site-packages/nvidia/nccl/lib:$LD_LIBRARY_PATH
+export PYTHONWARNINGS="ignore::DeprecationWarning,ignore::FutureWarning,ignore::RuntimeWarning"

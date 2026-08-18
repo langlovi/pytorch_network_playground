@@ -28,15 +28,15 @@ SCHEDULER_CHOICE = Literal["linear", "cosine_annealing", "reduce_on_plateau", "s
 class DataConfig:
     # changes in this config will create a NEW hash of the data
     target_map: Dict[str, int] = field(default_factory=lambda: {"hh": 0, "tt": 1, "dy": 2}) # node: index
-    continuous_features: List[str] = features.continuous_features
-    categorical_features: List[str] = features.categorical_features
+    continuous_features: List[str] = field(init=False)
+    categorical_features: List[str] = field(init=False)
     dataset_pattern: Tuple[str] = (
         "dy_*",
         "tt_*",
         "hh_ggf_hbb_htt_kl1_kt1*",
         # "hh_ggf_hbb_htt_kl0_kt1*",
         )
-    eras: Tuple[ERAS_CHOICE] = ("22pre")
+    eras: Tuple[ERAS_CHOICE] = ("22pre",) #, "22post", "23pre", "23post")
     datasets: Optional[List[str]] = None
     cuts: Optional[Any] = None
     dummy_values = -99999 # value used to fill in missing values
@@ -44,6 +44,8 @@ class DataConfig:
     def __post_init__(self):
         # a dictionary of all files corresponding to a certain dataset
         self.datasets = find_datasets(self.dataset_pattern, self.eras, file_type="root", verbose=False)
+        self.continuous_features = features.continuous_features
+        self.categorical_features = features.categorical_features
     # TODO HASH ?
 
 
@@ -80,7 +82,7 @@ class ModelBuildingConfig:
     freeze_skip_connection: bool = True # True = non-learnable skip connection value
     batch_norm_eps: float = 0.001 # epsilon denominator of batch norm - increase stability Marcel: 0.001
     LBN_M: int = 10 # number of particles of the lbn network Marcel: 10
-    last_activation_fn: LAST_ACTIVATION_CHOICE = "Softmax" # add activation function after last layer
+    last_activation_fn: LAST_ACTIVATION_CHOICE = None # add activation function after last layer
     use_last_activation: bool = True # whether to use the last activation function, can be deactivated if not wanted - for example when using a loss function that already includes an activation like cross entropy, Marcel: False
 
     #STD Layers
@@ -157,13 +159,13 @@ class TrainingConfig:
         51699: 1, 51702: 1, 51705: 1, 51708: 1, 51711: 1, 51714: 1, 51693: 1,
         51668: 1, 51684: 1, 51663: 1, 51679: 1,
         },
-        "dy_to_tau":{(51720, 51723, 51726, 51729, 51732, 51735, 51699, 51702, 
-        51705, 51708, 51711, 51714, 51693): 2},
-        "dy_to_e":{(51667, 51664, 51674, 51665, 51661, 51670, 51671, 51672, 51673, 51675, 51666, 51668, 51663): 1 },
-        "dy_to_mu":{(51683, 51680, 51690, 51681, 51677, 51686, 51687, 51688, 51689, 51691, 51682, 51684, 51679): 1},
+        "dy2tau":{(51720, 51723, 51726, 51729, 51732, 51735, 51699, 51702, 
+        51705, 51708, 51711, 51714, 51693): 1},
+        "dy2e":{(51667, 51664, 51674, 51665, 51661, 51670, 51671, 51672, 51673, 51675, 51666, 51668, 51663): 1},
+        "dy2mu":{(51683, 51680, 51690, 51681, 51677, 51686, 51687, 51688, 51689, 51691, 51682, 51684, 51679): 1},
 
     })
-    use_sub_process_ratios: Tuple[str] = ("dy_to_tau",) #muss komma hinten haben
+    use_sub_process_ratios: Tuple[str] = ("dy2tau",) #muss komma hinten haben
     sample_attributes: Tuple[str, ...] = (
         "continuous",
         "categorical",
