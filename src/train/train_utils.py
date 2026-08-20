@@ -68,7 +68,7 @@ def log_metrics(
     def _optional(*keys, log_name=None) -> bool:
         """
         Helper function to enable optional logs only when all *keys* exist.
-        Typical case: A log describe a model specific information like binnings of learnable edges.
+        Typical case: A log describe a model specific information like binnings of learnabl edges.
         Only specific models have this information, thus this should not be logged if it is not prevalent.
 
         Returns:
@@ -131,7 +131,7 @@ def log_metrics(
         "hh": (21101,),
         "tt":(1100,1200,1300), # groups are possible, and mixes are allowed
         "dy2tau":(51720, 51723, 51726, 51729, 51732, 51735, 51699, 51702, 
-        51705, 51708, 51711, 51714, 51693,),
+        51705, 51708, 51711, 51714, 51693),
         "dy2e":(51667, 51664, 51674, 51665, 51661, 51670, 51671, 51672, 
         51673, 51675, 51666, 51668, 51663),
         "dy2mu":(51683, 51680, 51690, 51681, 51677, 51686, 51687, 51688, 51689, 

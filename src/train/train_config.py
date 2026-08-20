@@ -36,7 +36,7 @@ class DataConfig:
         "hh_ggf_hbb_htt_kl1_kt1*",
         # "hh_ggf_hbb_htt_kl0_kt1*",
         )
-    eras: Tuple[ERAS_CHOICE] = ("22pre",) #, "22post", "23pre", "23post")
+    eras: Tuple[ERAS_CHOICE] = ("22pre", "22post", "23pre", "23post")
     datasets: Optional[List[str]] = None
     cuts: Optional[Any] = None
     dummy_values = -99999 # value used to fill in missing values
@@ -144,7 +144,7 @@ class TrainingConfig:
     train_ratio: float = 0.75 # split ratio for k-fold data into train and validation
     t_batch_size: int = 4096 * 10
     v_batch_size: int = -1 # validation batch size, -1 = full set,
-    save_model_name: str = "reweighted_process_id:doubled_tau_weights" # name of the model used to save
+    save_model_name: str = "reweighted_process_ids:1.5x_tau" # name of the model used to save
 
     # Sampler Settings
     sample_ratio: Dict[str, float] = field(default_factory=lambda:{"dy": 1 / 3, "tt": 1 / 3, "hh": 1 / 3}) # decide the ratio of tt, dy and hh within a batch
@@ -160,7 +160,7 @@ class TrainingConfig:
         51668: 1, 51684: 1, 51663: 1, 51679: 1,
         },
         "dy2tau":{(51720, 51723, 51726, 51729, 51732, 51735, 51699, 51702, 
-        51705, 51708, 51711, 51714, 51693): 1},
+        51705, 51708, 51711, 51714, 51693): 1.5},
         "dy2e":{(51667, 51664, 51674, 51665, 51661, 51670, 51671, 51672, 51673, 51675, 51666, 51668, 51663): 1},
         "dy2mu":{(51683, 51680, 51690, 51681, 51677, 51686, 51687, 51688, 51689, 51691, 51682, 51684, 51679): 1},
 
@@ -198,7 +198,7 @@ class SchedulerConfig:
 
     @dataclass
     class StepLRConfig(): # used by marcel
-        step_size: int = 10 # number of iterations between two learning rate reductions
+        step_size: int =7500  # number of iterations between two learning rate reductions (vorher 10)
         gamma: float = 0.5 # learning rate reduction factor
         # min_delta: float = 0.0 # minimum improvement before increase patience - Marcel: 0
 

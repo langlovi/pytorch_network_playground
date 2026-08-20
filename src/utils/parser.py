@@ -33,7 +33,7 @@ class ParserBuilder():
         "-s",
         dest="save_cache",
         action="store_true",
-        default=False,
+        default=True,
         help="Save cache (default: False)"
         )
 
@@ -67,8 +67,8 @@ class ParserBuilder():
             "--add_activation",
             required=False,
             help="If value is given, get activation function and add at end of network",
-            default=None,
-            choices=["sigmoid", "softmax", None],
+            default="identity",
+            choices=["sigmoid", "softmax", "identity"],
         )
 
     def add_save_path(self):
@@ -99,10 +99,13 @@ class ParserBuilder():
 
     def add_evaluate_choices(self):
         def choices(value):
-            value = (value,) if isinstance(value, str) else value
+            value = value.split(",")
+            value = [v.strip() for v in value]
             value_possible_choices = ("test", "training", "validation")
 
-            if not any([value not in value_possible_choices]):
+            _check = [v in value_possible_choices for v in value]
+
+            if not all(_check):
                 raise ValueError(f"Evaluate is {value}, but can only be one of these: {value_possible_choices}")
             return value
 
@@ -121,6 +124,48 @@ class ParserBuilder():
         )
 
 
+    def add_batching(self):
+        def valid_batch_size(value):
+            value = int(value)
+            assert value >= 1, "batch size can't be negative or zero"
+            return value
+
+        self.parser.add_argument(
+            "--batch_size",
+            "-bs",
+            dest="batch_size",
+            type=valid_batch_size,
+            required=True,
+            help=(
+            """
+            Batch Size used for event loop.
+            """
+            )
+        )
+
+    def add_num_threading(self):
+        def valid_threads(value):
+            import torch
+            value = int(value)
+            assert value >= 0, "num of threads can't be negative"
+
+            if value > 0:
+                torch.set_num_threads(num_threads)
+            return None
+
+        self.parser.add_argument(
+            "--num_threads",
+            "-nt",
+            dest="num_threads",
+            default="0",
+            type=valid_threads,
+            required=False,
+            help=(
+            """
+            Number of threads for interops calculations. If threads is set 0 all existing threads are used.
+            """
+            )
+        )
 
     def build(self, args):
         commands = [f"add_{arg}" for arg in args]

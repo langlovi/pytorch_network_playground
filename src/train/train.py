@@ -18,6 +18,8 @@ from train.train_config import full_config
 from train.train_utils import log_metrics
 from utils import logger
 
+from collections import deque
+
 CPU = torch.device("cpu")
 CUDA = torch.device("cuda")
 DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
@@ -114,6 +116,7 @@ def main(**kwargs):
         ### training loop
         #----
         logger_inst.info("Start training loop")
+        last_losses = deque([10, 10, 10, 10, 10, 10, 10, 10, 10, 10], maxlen = 10)
         for current_iteration in range(1_000_000):
             t_loss = training_loop(
                 model = model_inst,
@@ -142,6 +145,8 @@ def main(**kwargs):
                     sample_columns=full_config.training_config.sample_attributes,
                     device=DEVICE
                     )
+                
+                eval_t_pred = torch.nn.functional.softmax(eval_t_pred, dim=1)
                 # TODO when edges should be tracked add this in a way that is universal and does not break for models without binning layer, e.g. add property to model that returns None if no binning layer is present and add check in log_metrics
                 # evaluation of validation
                 logger_inst.info(f"Iteration {current_iteration}. Start evaluation of validation data.")
@@ -153,6 +158,9 @@ def main(**kwargs):
                     sample_columns=full_config.training_config.sample_attributes,
                     device=DEVICE
                     )
+                
+                eval_v_pred = torch.nn.functional.softmax(eval_v_pred, dim=1)
+
                 # TODO when edges should be tracked add this in a way that is universal and does not break for models without binning layer, e.g. add property to model that returns None if no binning layer is present and add check in log_metrics
                 if full_config.training_config.log_metrics:
                     log_metrics(
@@ -187,10 +195,11 @@ def main(**kwargs):
                         dataset_id = eval_v_dataset_id,
                     )
                 logger_inst.training(f"Iteration: {current_iteration} - TLoss: {eval_t_loss:.2E} VLoss: {eval_v_loss:.2E}")
-
+                last_losses.append(eval_v_loss.cpu().item())
+                mean_last_losses = np.mean(last_losses)
 
                 ### checkpoint criteria checks and saving
-                if checkpoint_inst.check_criteria(eval_v_loss):
+                if checkpoint_inst.check_criteria(mean_last_losses):
                     checkpoint_inst.create_checkpoint(
                         model=model_inst,
                         optimizer=optimizer_inst,
