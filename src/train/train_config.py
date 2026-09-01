@@ -144,7 +144,7 @@ class TrainingConfig:
     train_ratio: float = 0.75 # split ratio for k-fold data into train and validation
     t_batch_size: int = 4096 * 10
     v_batch_size: int = -1 # validation batch size, -1 = full set,
-    save_model_name: str = "reweighted_process_ids:1.5x_tau" # name of the model used to save
+    save_model_name: str = "reweighted_process_ids:unchanged" # name of the model used to save
 
     # Sampler Settings
     sample_ratio: Dict[str, float] = field(default_factory=lambda:{"dy": 1 / 3, "tt": 1 / 3, "hh": 1 / 3}) # decide the ratio of tt, dy and hh within a batch
@@ -158,9 +158,14 @@ class TrainingConfig:
         51686: 1, 51687: 1, 51688: 1, 51689: 1, 51691: 1, 51666: 1, 51682: 1,
         51699: 1, 51702: 1, 51705: 1, 51708: 1, 51711: 1, 51714: 1, 51693: 1,
         51668: 1, 51684: 1, 51663: 1, 51679: 1,
+        #neue ids in erweitertem Datensatz:
+        51694: 1, 51695: 1, 51700: 1, 51701: 1, 51703: 1, 51704: 1, 51706: 1,
+        51707: 1, 51709: 1, 51710: 1, 51712: 1, 51715: 1, 51721: 1, 51722: 1,
+        51724: 1, 51725: 1, 51727: 1, 51728: 1, 51730: 1, 51731: 1, 51733: 1, 
+        51734: 1, 51736: 1, 51737: 1
         },
         "dy2tau":{(51720, 51723, 51726, 51729, 51732, 51735, 51699, 51702, 
-        51705, 51708, 51711, 51714, 51693): 1.5},
+        51705, 51708, 51711, 51714, 51693): 1},
         "dy2e":{(51667, 51664, 51674, 51665, 51661, 51670, 51671, 51672, 51673, 51675, 51666, 51668, 51663): 1},
         "dy2mu":{(51683, 51680, 51690, 51681, 51677, 51686, 51687, 51688, 51689, 51691, 51682, 51684, 51679): 1},
 
@@ -190,7 +195,7 @@ class TrainingConfig:
 
 @dataclass
 class SchedulerConfig:
-    scheduler_chain: Tuple[SCHEDULER_CHOICE, ...] = ("linear", "step") # schedulers used in chain
+    scheduler_chain: Tuple[SCHEDULER_CHOICE, ...] = ("reduce_on_plateau",) # schedulers used in chain
     config_chain: Optional[Tuple[Any, ...]] = None # list of configs corresponding to the schedulers in the scheduler chain
     scheduler_cls_chain: Optional[Tuple[Any, ...]] = None # list of scheduler classes corresponding to the schedulers in the scheduler chain, if None is given, it is assumed that the scheduler class can be derived from the scheduler choice by adding "LR" at the end, for example "CosineAnnealingLR" for "cosine"
     milestones: Tuple[int, ...] = (500,) # intervals after which the LR scheduler is swapped
@@ -211,12 +216,12 @@ class SchedulerConfig:
     @dataclass
     class ReduceLROnPlateauConfig():
         mode: str ='min' # one of {min, max}, in min mode lr will be reduced when the quantity monitored has stopped decreasing
-        patience: int = 4 # wait x number of checks - Marcel: 10
+        patience: int = 10 # wait x number of checks - Marcel: 10
         threshold_mode: str = "abs" # type of min_delta - Marcel: abs
         factor: float = 0.5 # LR reduce by factor
-        cooldown: int = 0, # number of iterations to wait after a learning rate reduction before resuming normal operation
-        min_lr: float = 0, # lower bound on the learning rate
-        eps: float = 1e-08,  # minimal decay applied to lr, if it is smaller than this value, it is set to this value
+        cooldown: int = 0 # number of iterations to wait after a learning rate reduction before resuming normal operation
+        min_lr: float = 1e-7 # lower bound on the learning rate
+        eps: float = 1e-08  # minimal decay applied to lr, if it is smaller than this value, it is set to this value
 
     @dataclass
     class LinearLRConfig():

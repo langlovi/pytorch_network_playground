@@ -83,6 +83,7 @@ def main(**kwargs):
             train=True,
             **_sampler_config,
         )
+
         validation_sampler = sampler.create_sampler(
             validation_events,
             train=False,
@@ -111,6 +112,10 @@ def main(**kwargs):
         training_loss_inst, validation_loss_inst = init_loss(full_config=full_config, device=DEVICE, training_sampler=training_sampler)
         scheduler_inst = init_scheduler(full_config=full_config, optimizer_inst=optimizer_inst)
         checkpoint_inst = CheckPoint(checkpoint_name=full_config.training_config.save_model_name, checkpoint_fold=current_fold)
+        
+        from src.optimizer.scheduler_handler import SchedulerHandler
+
+        scheduler_handler_inst = SchedulerHandler(scheduler_inst=scheduler_inst, checkpoint_inst=checkpoint_inst, logger_inst=logger_inst)
 
         #----
         ### training loop
@@ -125,7 +130,7 @@ def main(**kwargs):
                 sampler = training_sampler,
                 device=DEVICE,
                 sample_columns = full_config.training_config.sample_attributes,
-                scheduler_inst = scheduler_inst,
+                scheduler_handler_inst=scheduler_handler_inst,
             )
             if current_iteration % full_config.training_config.verbose_interval == 0:
                 tensorboard_writer.log_loss({"batch_loss": t_loss.item()}, step=current_iteration)
@@ -208,25 +213,31 @@ def main(**kwargs):
                         full_config=full_config,
                     )
 
+                if optimizer_inst.param_groups[0]["lr"] <= scheduler_inst.min_lrs[0]:
+                    break           
+
+
+                scheduler_handler_inst.step(model_inst, optimizer_inst, metric=eval_v_loss)
+
                 # if metric does not improve x-times reduce
                 # load previous checkpoint with reduces learning rate
 
-                # when using ReduceLROnPlateau, step scheduler and check if lr was reduced, if yes load last checkpoint and update optimizer with new lr
-                if isinstance(scheduler_inst, torch.optim.lr_scheduler.ReduceLROnPlateau):
-                    previous_lr =  optimizer_inst.param_groups[0]["lr"]
-                    scheduler_inst.step(eval_v_loss)
-                    current_lr = optimizer_inst.param_groups[0]["lr"]
-                    if previous_lr != current_lr:
-                        logger_inst.info(
-                            f"{previous_lr} -> {current_lr}" +
-                            "\nReload model and optimizer from iteration"
-                            f" {checkpoint_inst.last_checkpoint['iteration']}")
+                # # when using ReduceLROnPlateau, step scheduler and check if lr was reduced, if yes load last checkpoint and update optimizer with new lr
+                # if isinstance(scheduler_inst, torch.optim.lr_scheduler.ReduceLROnPlateau):
+                #     previous_lr =  optimizer_inst.param_groups[0]["lr"]
+                #     scheduler_inst.step(eval_v_loss)
+                #     current_lr = optimizer_inst.param_groups[0]["lr"]
+                #     if previous_lr != current_lr:
+                #         logger_inst.info(
+                #             f"{previous_lr} -> {current_lr}" +
+                #             "\nReload model and optimizer from iteration"
+                #             f" {checkpoint_inst.last_checkpoint['iteration']}")
 
-                        model_inst.load_state_dict(checkpoint_inst.last_checkpoint["model_state_dict"])
-                        optimizer_inst.load_state_dict(checkpoint_inst.last_checkpoint["optimizer_state_dict"])
-                        # since scheduler and optimizer are coupled
-                        # overwrite old lr in checkpoint with lr after scheduler step
-                        optimizer_inst.param_groups[0]["lr"] = current_lr
+                #         model_inst.load_state_dict(checkpoint_inst.last_checkpoint["model_state_dict"])
+                #         optimizer_inst.load_state_dict(checkpoint_inst.last_checkpoint["optimizer_state_dict"])
+                #         # since scheduler and optimizer are coupled
+                #         # overwrite old lr in checkpoint with lr after scheduler step
+                #         optimizer_inst.param_groups[0]["lr"] = current_lr
 
         from IPython import embed
         embed(header="Training ends: Check if everything is as you thought it would be")
@@ -242,3 +253,5 @@ if __name__ == "__main__":
         tensorboard_name=parser.args.tensorboard_name
 
         )
+
+

@@ -122,7 +122,7 @@ class TrainingLoop(BaseLoop):
         optimizer,
         sampler,
         device,
-        scheduler_inst=None,
+        scheduler_handler=None,
         *args,
         **kwargs,
         ):
@@ -141,8 +141,9 @@ class TrainingLoop(BaseLoop):
         loss = loss_fn(predictions, targets, event_weights=None)
         loss.backward()
         optimizer.step()
-        if scheduler_inst is not None:
-            scheduler_inst.step()
+
+        if scheduler_handler is not None:
+            scheduler_handler.step(model_inst=model, optimizer_inst=optimizer, metric=None)
 
         return loss
 
