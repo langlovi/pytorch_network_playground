@@ -1130,7 +1130,6 @@ class LBNFeaturerExtractor(torch.nn.Module):
         t = []
         for f in self._particles[:-3]:
             t.append(tensor[:, self.particles[f]])
-
         # met is special, since we need to reconstruct it: (pt, px, py ,0)
         met_kinematics = tensor[:, self.particles["met"]]
 

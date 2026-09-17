@@ -15,6 +15,8 @@ from src.utils import get_logger
 from src.utils.parser import ParserBuilder
 from tqdm import tqdm
 
+import os
+
 logger_inst = get_logger(__name__)
 
 def last_fn_picker(last_fn):
@@ -68,6 +70,8 @@ def evaluate_model_on_fold(
             "normalization_weights",
             "product_of_weights",
             "evaluation_mask",
+            "channel_id",  #neu hinzugefügt
+
         )
 
         num_targets = len(full_config.dataset_config.target_map.values())
@@ -125,9 +129,13 @@ def evaluate_model_on_fold(
                 # add splitted content on top
                 for column in columns_to_split:
                     dnn_scores[fold][uid][column] = events[uid][column][idx]
-                dnn_scores[fold][uid]["eventweights"] = events[uid]["product_of_weights"][idx]*events[uid]["normalization_weights"][idx] # selbst hinzugefügt
+                if os.environ.get("ERA") == "prod28":
+                    dnn_scores[fold][uid]["eventweights"] = events[uid]["product_of_weights"][idx] #weights in prod28 richtig
+                else:
+                    dnn_scores[fold][uid]["eventweights"] = events[uid]["product_of_weights"][idx]*events[uid]["normalization_weights"][idx] # selbst hinzugefügt
 
             del uid_scores
+        from IPython import embed; embed(header="MESSAGE Line 131 | File: evaluate.py")
         return dnn_scores
 
 

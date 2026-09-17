@@ -1,3 +1,4 @@
+
 from __future__ import annotations
 
 from collections.abc import Iterable
@@ -6,6 +7,28 @@ import torch
 
 from train import plotting
 from utils import logger
+
+import time
+from collections import defaultdict
+from contextlib import contextmanager
+
+plot_timings: dict[str, list[float]] = defaultdict(list)
+
+@contextmanager
+def time_block(name: str):
+    """Measure and record the wall-clock duration of a code block.
+
+    Args:
+        name: Label under which the duration is stored, e.g. a plot's name.
+
+    Yields:
+        None. Timing happens as a side effect on exit.
+    """
+    start = time.perf_counter()
+    try:
+        yield
+    finally:
+        plot_timings[name].append(time.perf_counter() - start)
 
 logger_inst = logger.get_logger(__name__)
 
@@ -83,6 +106,7 @@ def log_metrics(
         return True
 
     logger_inst.info(f"Start {mode} Logs at iteration {iteration_step}")
+    
     # logs and plots that are ALWAYS plotted
 
     # outputs of network
@@ -106,6 +130,7 @@ def log_metrics(
     )
     tensorboard_inst.log_figure(f"{mode} node output", pred_fig, step=iteration_step)
 
+
     # confusion matrix plot
     c_mat_fig, c_mat_ax, c_mat = plotting.confusion_matrix(
         tar,
@@ -116,72 +141,72 @@ def log_metrics(
     )
     tensorboard_inst.log_figure(f"{mode} confusion matrix", c_mat_fig, step=iteration_step)
 
-    roc_fig, roc_ax = plotting.roc_curve(
-        tar,
-        pred,
-        sample_weight=weights,
-        labels=list(target_map.keys())
-    )
-    tensorboard_inst.log_figure(f"{mode} roc curve one vs rest", roc_fig, step=iteration_step)
+#roc curve erstmal deaktivieren, verlangsamt das training
+#    roc_fig, roc_ax = plotting.roc_curve(
+#        tar,
+#        pred,
+#        sample_weight=weights,
+#        labels=list(target_map.keys())
+#    )
+#    tensorboard_inst.log_figure(f"{mode} roc curve one vs rest", roc_fig, step=iteration_step)
+    with time_block("PIDs"):  #aufrufen mit plot_timings["PIDs"], liste aller unter pids gespeicherten Zeiten
+        if _optional("dataset_id", log_name="ProcessID Loss"):
+            uids = data["dataset_id"]
 
-    if _optional("dataset_id", log_name="ProcessID Loss"):
-        uids = data["dataset_id"]
-
-        grouped_ids = {                         #grouped_ids are plotted in groups
-        "hh": (21101,),
-        "tt":(1100,1200,1300), # groups are possible, and mixes are allowed
-        "dy2tau":(51720, 51723, 51726, 51729, 51732, 51735, 51699, 51702, 
-        51705, 51708, 51711, 51714, 51693,
-        #neue PIDs des erweiterten Datensatzes 2022,2023 pre und post. stand 21.08.2026
-        51694, 51695, 51700, 51701, 51703, 51704, 51706, 51707, 51709, 51710, 
-        51712, 51715, 51721, 51722, 51724, 51725, 51727, 51728, 51730, 51731, 
-        51733, 51734,51736,51737
-        ),
-        "dy2e":(51667, 51664, 51674, 51665, 51661, 51670, 51671, 51672, 
-        51673, 51675, 51666, 51668, 51663),
-        "dy2mu":(51683, 51680, 51690, 51681, 51677, 51686, 51687, 51688, 51689, 
-        51691, 51682, 51684, 51679),
-        }
-        single_ids = [] #list(grouped_ids["dy2mu"])  #single_ids are plotted separately
+            grouped_ids = {                         #grouped_ids are plotted in groups
+            "hh": (21101,),
+            "tt":(1100,1200,1300), # groups are possible, and mixes are allowed
+            "dy2tau":(51720, 51723, 51726, 51729, 51732, 51735, 51699, 51702, 
+            51705, 51708, 51711, 51714, 51693,
+            #neue PIDs des erweiterten Datensatzes 2022,2023 pre und post. stand 21.08.2026
+            51694, 51695, 51700, 51701, 51703, 51704, 51706, 51707, 51709, 51710, 
+            51712, 51715, 51721, 51722, 51724, 51725, 51727, 51728, 51730, 51731, 
+            51733, 51734,51736,51737
+            ),
+            "dy2e":(51667, 51664, 51674, 51665, 51661, 51670, 51671, 51672, 
+            51673, 51675, 51666, 51668, 51663),
+            "dy2mu":(51683, 51680, 51690, 51681, 51677, 51686, 51687, 51688, 51689, 
+            51691, 51682, 51684, 51679),
+            }
+            single_ids = [] #list(grouped_ids["dy2mu"])  #single_ids are plotted separately
 
 
-        all_plots = grouped_ids.copy()
-        for s_id in  single_ids:
-            all_plots[str(s_id)] = (s_id,)
+            all_plots = grouped_ids.copy()
+            for s_id in  single_ids:
+                all_plots[str(s_id)] = (s_id,)
 
-        for group_name, group_ids in all_plots.items():
-            
-            # Wandle das Tupel (die Unterkategorie) in einen Tensor um.
-            # WICHTIG: Er muss auf dem gleichen Gerät (CPU/GPU) liegen wie 'uids'.
-            group_tensor = torch.tensor(group_ids, device=uids.device)
-            
-            # Prüft für jedes Element in 'uids', ob es in 'group_tensor' enthalten ist.
-            mask = torch.isin(uids, group_tensor).flatten()
+            for group_name, group_ids in all_plots.items():
+                
+                # Wandle das Tupel (die Unterkategorie) in einen Tensor um.
+                # WICHTIG: Er muss auf dem gleichen Gerät (CPU/GPU) liegen wie 'uids'.
+                group_tensor = torch.tensor(group_ids, device=uids.device)
+                
+                # Prüft für jedes Element in 'uids', ob es in 'group_tensor' enthalten ist.
+                mask = torch.isin(uids, group_tensor).flatten()
 
-            # Überspringe die Berechnung, wenn die Maske komplett 'False' ist
-            if not mask.any():
-                continue
+                # Überspringe die Berechnung, wenn die Maske komplett 'False' ist
+                if not mask.any():
+                    continue
 
-            masked_pred = pred[mask]
-            masked_tar = tar[mask]
-            masked_weight = weights[mask]
+                masked_pred = pred[mask]
+                masked_tar = tar[mask]
+                masked_weight = weights[mask]
 
-            cce_pid_metric = torch.nn.functional.cross_entropy(
-                masked_pred,
-                masked_tar,
-                weight=None,
-                reduction="none"
-            )
+                cce_pid_metric = torch.nn.functional.cross_entropy(
+                    masked_pred,
+                    masked_tar,
+                    weight=None,
+                    reduction="none"
+                )
 
-            cce_pid_weights = masked_weight.reshape(cce_pid_metric.shape)
-            cce_pid_weighted_metric = torch.mean(cce_pid_metric * cce_pid_weights)
-            
-            tensorboard_inst.log_scalar(
-                values={group_name: cce_pid_weighted_metric},
-                step=iteration_step,
-                name=f"{mode} - PID CrossEntropy"
-            )
-
+                cce_pid_weights = masked_weight.reshape(cce_pid_metric.shape)
+                cce_pid_weighted_metric = torch.mean(cce_pid_metric * cce_pid_weights)
+                
+                tensorboard_inst.log_scalar(
+                    values={group_name: cce_pid_weighted_metric},
+                    step=iteration_step,
+                    name=f"{mode} - PID CrossEntropy"
+                )
 
 
         # to_filter = []

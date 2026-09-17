@@ -11,6 +11,7 @@ import numpy.lib.recfunctions as rfn
 from data.cache import DataCacher
 from data.utils import depthCount
 from utils import logger
+from utils.utils import EMPTY_FLOAT
 
 logger_inst = logger.get_logger(__name__)
 
@@ -43,7 +44,7 @@ def root_to_numpy(
     #   used for baseline cut -> tau2_isolated, lepton_os, channel_id
     #   event number used for k-fold splitting -> event
     #   oversampling weight that defines the fraction within batch -> normalization_weight
-    meta_fields = {"process_id", "tau2_isolated", "leptons_os", "channel_id", "event", "normalization_weight"}
+    meta_fields = {"process_id", "leptons_os", "channel_id", "event", "normalization_weight"}
 
     # training and evaluation phase space are not the same
     # a transfer weight can be calculated using the product of these weights
@@ -58,12 +59,20 @@ def root_to_numpy(
     # handling cuts
     # by default all analysis has a base cut applied
     # if further cuts are desired, cut is applied on top of baseline cut
+
+    # baseline_cuts = [
+    #     "(tau2_isolated == 1)",
+    #     "(leptons_os == 1)",
+    #     "((channel_id == 1) | (channel_id == 2) | (channel_id == 3))",
+    #     "(reg_dnn_moe_vis_tau2_charge == 1) | (reg_dnn_moe_vis_tau2_charge == -1)",
+    # ]
+
     baseline_cuts = [
-        "(tau2_isolated == 1)",
         "(leptons_os == 1)",
-        "((channel_id == 1) | (channel_id == 2) | (channel_id == 3))",
         "(reg_dnn_moe_vis_tau2_charge == 1) | (reg_dnn_moe_vis_tau2_charge == -1)",
-    ]
+        "(reg_dnn_moe_vis_tau1_charge == 1) | (reg_dnn_moe_vis_tau1_charge == -1)",
+        "((channel_id == 1) & (num_taus_iso >= 1)) | ((channel_id == 2) & (num_taus_iso >= 1)) | ((channel_id == 3) & (num_taus_iso >= 2))",
+        "(vbf_dnn_moe_hh_vbf < 0.5)"]
 
     if isinstance(cut, str):
         cut = [cut]
@@ -91,8 +100,7 @@ def root_to_numpy(
             # step 2
             weights_in_root_file = set(tree.keys()).intersection(weights)
             weights_arrays = tree.arrays(weights_in_root_file, library="ak", cut=final_cut)
-
-            combined_weight = weights_arrays[normalization_weight]
+            combined_weight = all_branches_array["normalization_weight"]
             for weight in weights_in_root_file:
                 combined_weight = combined_weight * weights_arrays[weight]
             all_branches_array["combined_weight"] = combined_weight
@@ -289,6 +297,7 @@ def handle_weights_and_convert_to_torch(events: np.array, continuous_features: l
         total_evaluation_weight = torch.sum(product_of_all_weights[final_mask])
 
         event_id = struct_to_group_tensor(arr, ["event"], dtype=torch.int64).flatten()
+        channel_id = struct_to_group_tensor(arr, ["channel_id"], dtype=torch.float32).flatten()
 
         events[uid] = {
             "continuous": continuous_tensor,
@@ -307,6 +316,7 @@ def handle_weights_and_convert_to_torch(events: np.array, continuous_features: l
                 "di_tau": masks_tensor[:, 1],
                 "di_bjet": masks_tensor[:, 2],
                 },
+            "channel_id" : channel_id
         }
         del arr
     return events
@@ -329,6 +339,37 @@ def get_data(config , _save_cache = False, ignore_cache=False) -> dict[torch.Ten
     # when cache exist load -> it and return the data
     if not ignore_cache and cacher.path.exists():
         events = cacher.load_cache()
+
+        # filter empty in categories out, sollte mit neuem cache eigentlich überflüssig sein. Denn jetzt wurde der Filter vis_tau2_charge == 1oder -1 eingefügt
+        for uid, _events in events.items():
+            cat = _events.get("categorical")[:, 0] # only looking for 1 event, since if 1 is broken all are broken
+            empty_arr = torch.full_like(cat, EMPTY_FLOAT)
+            broken_mask = (cat == empty_arr)
+            broken_sum = torch.sum(broken_mask)
+
+            survival_mask = ~broken_mask
+
+            if broken_sum > 0:
+                print(f"filter from {uid} {broken_sum} events out")
+
+                # replace all arrays in events with mask to fix the empty value
+                
+                for array_key, array in _events.items():
+                    if torch.is_tensor(array) or isinstance(array, np.ndarray):
+                        if isinstance(array, np.ndarray):
+                            array = torch.from_numpy(array)
+
+                        if not array.shape:
+                            continue 
+                        events[uid][array_key] = array[survival_mask]
+                    else:
+                    # special case for nested dict 
+                        for _array_key, _array in array.items():
+                            events[uid][array_key][_array_key] = _array[survival_mask]
+
+                    
+
+
     else:
         logger_inst.info("Start loading and filtering of data")
         events = load_data(

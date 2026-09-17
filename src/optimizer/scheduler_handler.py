@@ -53,12 +53,14 @@ class SchedulerHandler():
         if previous_lr == current_lr:
             return False
 
-        return self._reload_after_lr_drop(
-            model_inst=model_inst,
-            optimizer_inst=optimizer_inst,
-            previous_lr=previous_lr,
-            current_lr=current_lr,
-            )
+        if metric_given:
+            return self._reload_after_lr_drop(
+                model_inst=model_inst,
+                optimizer_inst=optimizer_inst,
+                previous_lr=previous_lr,
+                current_lr=current_lr,
+                )
+        return True
 
 
     def _reload_after_lr_drop(

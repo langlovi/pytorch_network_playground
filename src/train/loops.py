@@ -141,7 +141,6 @@ class TrainingLoop(BaseLoop):
         loss = loss_fn(predictions, targets, event_weights=None)
         loss.backward()
         optimizer.step()
-
         if scheduler_handler is not None:
             scheduler_handler.step(model_inst=model, optimizer_inst=optimizer, metric=None)
 
@@ -241,7 +240,7 @@ class ValidationLoop(BaseLoop):
                 device=device
                 ).items():
                 # hold data for current dataset, saved in loop to avoid memory issues
-                for events in validation_batch_generator:
+                for idx, events in enumerate(validation_batch_generator):
                     pred = model_inst(
                         categorical_inputs=events.pop("categorical"),
                         continuous_inputs=events.pop("continuous")

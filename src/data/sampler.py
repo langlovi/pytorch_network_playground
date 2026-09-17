@@ -110,28 +110,29 @@ class Process(t_data.Dataset):
 
         returns: (dict[torch.Tensor]): Dictionary with sampled tensors for each attribute defined in *sample_from*.
         """
-        if self.current_idx >= len(self):
-            self.reset()
 
-        if number is None:
-            number = self.sample_size
+        max_events = len(self)
+        remaining = self.sample_size if number is None else number
 
-        if number > len(self):
-            # when required number is too big, set it to len of self to return all data
-            number = len(self)
-
-        start_idx = self.current_idx
-        # do not drop last, but instead create smaller 
-        next_idx = min(self.current_idx + number, len(self))
-        idx = self.indices[start_idx:next_idx]
-        self.current_idx = next_idx
+        chunks = []
+        while remaining > 0:
+            if self.current_idx >= max_events:
+                self.reset()
+            take = min(remaining, max_events - self.current_idx)
+            picked_indices = self.indices[self.current_idx : self.current_idx + take]
+            chunks.append(picked_indices)
+            self.current_idx +=take
+            remaining -= take
+        
+        
+        idx = chunks[0] if len(chunks) == 1 else torch.cat(chunks)
 
         # sample events from sample_from, and normalization weight per default
         sampled_events = {attribute:getattr(self, attribute)[idx].to(device) for attribute in sample_from}
         sampled_events["sample_weights"] = torch.full((len(idx), 1), self.weights_statistics["normalization_weights"]["whole_sum"] / self.sample_size).to(device)
         return sampled_events
 
-        # return self.continuous[idx].to(device), self.categorical[idx].to(device), self.targets[idx].to(device)
+
 
     def create_sample_generator(self, sample_from, batch_size=-1, device=CPU_DEVICE):
         """

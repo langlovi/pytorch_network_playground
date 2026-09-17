@@ -48,7 +48,6 @@ def main(**kwargs):
         # load data from cache is necessary or from root files
         # events is of form : {uid : {"continuous","categorical", "weight": torch tensor}}
         events = load_data.get_data(full_config.dataset_config, ignore_cache=kwargs["ignore_cache"], _save_cache=kwargs["save_cache"])
-
         # split data into training and validation according to fold and get collect all weight statistics
         fold_split_coordinator = preprocessing.FoldAndSplitCoordinator(
             events=events,
@@ -77,7 +76,7 @@ def main(**kwargs):
             "sample_ratio" : full_config.training_config.sample_ratio,
             "sub_sample_ratio" : full_config.training_config.sub_process_ratios,
         }
-
+        
         training_sampler = sampler.create_sampler(
             train_events,
             train=True,
@@ -116,7 +115,6 @@ def main(**kwargs):
         from src.optimizer.scheduler_handler import SchedulerHandler
 
         scheduler_handler_inst = SchedulerHandler(scheduler_inst=scheduler_inst, checkpoint_inst=checkpoint_inst, logger_inst=logger_inst)
-
         #----
         ### training loop
         #----
@@ -130,17 +128,21 @@ def main(**kwargs):
                 sampler = training_sampler,
                 device=DEVICE,
                 sample_columns = full_config.training_config.sample_attributes,
-                scheduler_handler_inst=scheduler_handler_inst,
+                scheduler_handler=scheduler_handler_inst,
             )
+
+
             if current_iteration % full_config.training_config.verbose_interval == 0:
                 tensorboard_writer.log_loss({"batch_loss": t_loss.item()}, step=current_iteration)
                 current_lr = optimizer_inst.param_groups[0]["lr"]
-                logger_inst.training(f"T-It: {current_iteration} - LR: {current_lr} - batch loss: {t_loss.item():.2E}")
+                sched_lr = scheduler_handler_inst.scheduler_inst.get_last_lr()
+                logger_inst.training(f"T-It: {current_iteration} - LR: {current_lr}/{sched_lr} - batch loss: {t_loss.item():.2E}")
             #----
             #### Evaluation of training and validation data, logging and checkpointing
             #----
-            if (current_iteration % full_config.training_config.validation_interval == 0) & (current_iteration >= 0):
-                # evaluation of training data
+################ mein code für ein größeres evaluierungsintervall im testset:
+            if (current_iteration % (full_config.training_config.validation_interval*5) == 0) & (current_iteration >= 0):
+            # evaluation of training data
                 logger_inst.info(f"Iteration {current_iteration}. Start evaluation of training data.")
 
                 eval_t_loss, (eval_t_pred, eval_t_tar, eval_t_weights, eval_t_dataset_id) = validation_loop(
@@ -152,6 +154,40 @@ def main(**kwargs):
                     )
                 
                 eval_t_pred = torch.nn.functional.softmax(eval_t_pred, dim=1)
+
+                if full_config.training_config.log_metrics:
+                    log_metrics(
+                        tensorboard_inst = tensorboard_writer,
+                        iteration_step = current_iteration,
+                        sampler_output = (eval_t_pred, eval_t_tar, eval_t_weights),
+                        target_map = full_config.dataset_config.target_map,
+                        mode = "train",
+                        loss = eval_t_loss.item(),
+                        lr = optimizer_inst.param_groups[0]["lr"],
+                        # binning_edges = model_inst.binning_layer.edges.detach().cpu(),
+                        # binning_edges = ,
+                        current_iteration = current_iteration,
+                        # kernels = model_inst.binning_layer.kernels,
+                        dataset_id = eval_t_dataset_id,
+                    )
+                
+                ##########mein code endet hier
+
+
+
+            if (current_iteration % full_config.training_config.validation_interval == 0) & (current_iteration >= 0):
+                # # evaluation of training data
+                # logger_inst.info(f"Iteration {current_iteration}. Start evaluation of training data.")
+
+                # eval_t_loss, (eval_t_pred, eval_t_tar, eval_t_weights, eval_t_dataset_id) = validation_loop(
+                #     model_inst,
+                #     validation_loss_inst,
+                #     training_sampler,
+                #     sample_columns=full_config.training_config.sample_attributes,
+                #     device=DEVICE
+                #     )
+                
+                # eval_t_pred = torch.nn.functional.softmax(eval_t_pred, dim=1)
                 # TODO when edges should be tracked add this in a way that is universal and does not break for models without binning layer, e.g. add property to model that returns None if no binning layer is present and add check in log_metrics
                 # evaluation of validation
                 logger_inst.info(f"Iteration {current_iteration}. Start evaluation of validation data.")
@@ -168,20 +204,20 @@ def main(**kwargs):
 
                 # TODO when edges should be tracked add this in a way that is universal and does not break for models without binning layer, e.g. add property to model that returns None if no binning layer is present and add check in log_metrics
                 if full_config.training_config.log_metrics:
-                    log_metrics(
-                        tensorboard_inst = tensorboard_writer,
-                        iteration_step = current_iteration,
-                        sampler_output = (eval_t_pred, eval_t_tar, eval_t_weights),
-                        target_map = full_config.dataset_config.target_map,
-                        mode = "train",
-                        loss = eval_t_loss.item(),
-                        lr = optimizer_inst.param_groups[0]["lr"],
-                        # binning_edges = model_inst.binning_layer.edges.detach().cpu(),
-                        # binning_edges = ,
-                        current_iteration = current_iteration,
-                        # kernels = model_inst.binning_layer.kernels,
-                        dataset_id = eval_t_dataset_id,
-                    )
+                    # log_metrics(
+                    #     tensorboard_inst = tensorboard_writer,
+                    #     iteration_step = current_iteration,
+                    #     sampler_output = (eval_t_pred, eval_t_tar, eval_t_weights),
+                    #     target_map = full_config.dataset_config.target_map,
+                    #     mode = "train",
+                    #     loss = eval_t_loss.item(),
+                    #     lr = optimizer_inst.param_groups[0]["lr"],
+                    #     # binning_edges = model_inst.binning_layer.edges.detach().cpu(),
+                    #     # binning_edges = ,
+                    #     current_iteration = current_iteration,
+                    #     # kernels = model_inst.binning_layer.kernels,
+                    #     dataset_id = eval_t_dataset_id,
+                    # )
 
 
 
@@ -200,11 +236,11 @@ def main(**kwargs):
                         dataset_id = eval_v_dataset_id,
                     )
                 logger_inst.training(f"Iteration: {current_iteration} - TLoss: {eval_t_loss:.2E} VLoss: {eval_v_loss:.2E}")
-                last_losses.append(eval_v_loss.cpu().item())
-                mean_last_losses = np.mean(last_losses)
+                #last_losses.append(eval_v_loss.cpu().item())
+                #mean_last_losses = np.mean(last_losses)
 
                 ### checkpoint criteria checks and saving
-                if checkpoint_inst.check_criteria(mean_last_losses):
+                if checkpoint_inst.check_criteria(eval_v_loss.item()):
                     checkpoint_inst.create_checkpoint(
                         model=model_inst,
                         optimizer=optimizer_inst,
@@ -238,6 +274,11 @@ def main(**kwargs):
                 #         # since scheduler and optimizer are coupled
                 #         # overwrite old lr in checkpoint with lr after scheduler step
                 #         optimizer_inst.param_groups[0]["lr"] = current_lr
+
+
+            
+
+
 
         from IPython import embed
         embed(header="Training ends: Check if everything is as you thought it would be")

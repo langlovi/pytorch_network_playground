@@ -37,6 +37,8 @@ class DataConfig:
         # "hh_ggf_hbb_htt_kl0_kt1*",
         )
     eras: Tuple[ERAS_CHOICE] = ("22pre", "22post", "23pre", "23post")
+    # eras: Tuple[ERAS_CHOICE] = ("23pre",)
+        
     datasets: Optional[List[str]] = None
     cuts: Optional[Any] = None
     dummy_values = -99999 # value used to fill in missing values
@@ -144,32 +146,21 @@ class TrainingConfig:
     train_ratio: float = 0.75 # split ratio for k-fold data into train and validation
     t_batch_size: int = 4096 * 10
     v_batch_size: int = -1 # validation batch size, -1 = full set,
-    save_model_name: str = "reweighted_process_ids:unchanged" # name of the model used to save
-
+    save_model_name: str = "A13" # name of the model used to save, KEIN PUNKT IM NAMEN!
+    
     # Sampler Settings
     sample_ratio: Dict[str, float] = field(default_factory=lambda:{"dy": 1 / 3, "tt": 1 / 3, "hh": 1 / 3}) # decide the ratio of tt, dy and hh within a batch
     sub_process_ratios: Dict[str, float] = field(default_factory=lambda:{ # decide the
         # HINT: each rate is multiplied together to final rate, e.g. if process id exist 2x with rate 2, final rate is 4
         "signal":{}, # empty categorizes are set to 1 by default
         "tt":{(1100,1200): 1, 1300: 1}, # groups are possible, and mixes are allowed
-        "dy":{51667: 1, 51683: 1, 51664: 1, 51680: 1, 51720: 1, 51723: 1, 51726: 1,
-        51729: 1, 51732: 1, 51735: 1, 51674: 1, 51690: 1, 51665: 1, 51681: 1,
-        51661: 1, 51677: 1, 51670: 1, 51671: 1, 51672: 1, 51673: 1, 51675: 1,
-        51686: 1, 51687: 1, 51688: 1, 51689: 1, 51691: 1, 51666: 1, 51682: 1,
-        51699: 1, 51702: 1, 51705: 1, 51708: 1, 51711: 1, 51714: 1, 51693: 1,
-        51668: 1, 51684: 1, 51663: 1, 51679: 1,
-        #neue ids in erweitertem Datensatz:
-        51694: 1, 51695: 1, 51700: 1, 51701: 1, 51703: 1, 51704: 1, 51706: 1,
-        51707: 1, 51709: 1, 51710: 1, 51712: 1, 51715: 1, 51721: 1, 51722: 1,
-        51724: 1, 51725: 1, 51727: 1, 51728: 1, 51730: 1, 51731: 1, 51733: 1, 
-        51734: 1, 51736: 1, 51737: 1
-        },
-        "dy2tau":{(51720, 51723, 51726, 51729, 51732, 51735, 51699, 51702, 
-        51705, 51708, 51711, 51714, 51693): 1},
-        "dy2e":{(51667, 51664, 51674, 51665, 51661, 51670, 51671, 51672, 51673, 51675, 51666, 51668, 51663): 1},
-        "dy2mu":{(51683, 51680, 51690, 51681, 51677, 51686, 51687, 51688, 51689, 51691, 51682, 51684, 51679): 1},
-
+        "dy":{51001: 1, 51718: 1, 51719: 1, 51694: 1, 51661: 1, 51677: 1, 51695: 1, 51669: 1, 51685: 1, 51697: 1, 51698: 1, 51662: 1, 51678: 1},
+        
+        "dy2tau":{(51718, 51719, 51694, 51695, 51697, 51698): 2.0},
+        "dy2e":{(51661, 51662, 51669): 1},
+        "dy2mu":{(51685, 51677, 51678): 1},
     })
+
     use_sub_process_ratios: Tuple[str] = ("dy2tau",) #muss komma hinten haben
     sample_attributes: Tuple[str, ...] = (
         "continuous",
@@ -203,7 +194,7 @@ class SchedulerConfig:
 
     @dataclass
     class StepLRConfig(): # used by marcel
-        step_size: int =7500  # number of iterations between two learning rate reductions (vorher 10)
+        step_size: int =20000 #mein wert: 7500  # number of iterations between two learning rate reductions (vorher 10)
         gamma: float = 0.5 # learning rate reduction factor
         # min_delta: float = 0.0 # minimum improvement before increase patience - Marcel: 0
 
@@ -216,11 +207,11 @@ class SchedulerConfig:
     @dataclass
     class ReduceLROnPlateauConfig():
         mode: str ='min' # one of {min, max}, in min mode lr will be reduced when the quantity monitored has stopped decreasing
-        patience: int = 10 # wait x number of checks - Marcel: 10
+        patience: int = 20 # wait x number of checks - Marcel: 10
         threshold_mode: str = "abs" # type of min_delta - Marcel: abs
         factor: float = 0.5 # LR reduce by factor
         cooldown: int = 0 # number of iterations to wait after a learning rate reduction before resuming normal operation
-        min_lr: float = 1e-7 # lower bound on the learning rate
+        min_lr: float = 2e-4 # lower bound on the learning rate
         eps: float = 1e-08  # minimal decay applied to lr, if it is smaller than this value, it is set to this value
 
     @dataclass
@@ -258,7 +249,7 @@ class OptimizerConfig:
     class ADAMWConfig():
         decay_factor: float = 500 # factor of L2 - Marcel: 500
         normalize: bool = True # normalize weight decay factor to number of parameters
-        lr: float = 1e-3 # start learning rate
+        lr: float = 1e-3 # ursprünglich e-3 start learning rate
 
     @dataclass
     class SAMConfig():
