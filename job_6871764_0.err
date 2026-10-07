@@ -1,0 +1,1 @@
+/var/lib/condor/util/job_wrapper.sh[238]: exec: /afs/desy.de/user/l/langlovi/pytorch_network_playground/run_test.sh: cannot execute [Permission denied]

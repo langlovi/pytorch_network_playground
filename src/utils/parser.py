@@ -9,6 +9,40 @@ class ParserBuilder():
         self.build(args)
         self.args = self.parser.parse_args()
 
+    #############################################################################################
+    #Eigene Argumente für die kommandozeile (06.10.2026)
+
+    def add_model_name(self):
+        self.parser.add_argument(
+            "--model_name",
+            "-mn",
+            dest="model_name",
+            type=str,
+            default=None,  # WICHTIG: None als Default
+            help="Überschreibt den Modellnamen aus der Config"
+        )
+
+    def add_seed(self):
+        self.parser.add_argument(
+            "--seed",
+            dest="seed",
+            type=int,
+            default=None,  # WICHTIG: None als Default
+            help="Überschreibt den Seed aus der Config"
+        )
+
+    def add_tau_weight(self):
+        self.parser.add_argument(
+            "--tau_weight",
+            "-tw",
+            dest="tau_weight",
+            type=float,
+            default=None,  # WICHTIG: None als Default
+            help="Überschreibt das Weight aus der Config"
+        )
+
+    ############################################################################################
+
     def add_tensorboard(self):
         self.parser.add_argument(
             "--tensorboard_name",

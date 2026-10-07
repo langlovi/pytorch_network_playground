@@ -24,8 +24,8 @@ CPU = torch.device("cpu")
 CUDA = torch.device("cuda")
 DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 
-torch.manual_seed(full_config.training_config.seed)
-np.random.seed(full_config.training_config.seed)
+#torch.manual_seed(full_config.training_config.seed) #entfernt für parser option (06.10.26)
+#np.random.seed(full_config.training_config.seed)       # gleiches hier
 
 def main(**kwargs):
     # prepare logger
@@ -280,19 +280,56 @@ def main(**kwargs):
 
 
 
-        from IPython import embed
-        embed(header="Training ends: Check if everything is as you thought it would be")
-
+#        from IPython import embed
+#        embed(header="Training ends: Check if everything is as you thought it would be")
 if __name__ == "__main__":
     from utils.parser import ParserBuilder
-    parser = ParserBuilder("tensorboard", "cache")
 
-    # call main with parsed args
+    # 1. Parser mit den neuen Parametern initialisieren
+    parser = ParserBuilder("tensorboard", "cache", "model_name", "seed", "tau_weight")
+    args = parser.args
+
+    # 2. Config mit CLI-Argumenten überschreiben (falls in CLI angegeben)
+    if args.seed is not None:
+        full_config.training_config.seed = args.seed
+        
+    if args.model_name is not None:
+        full_config.training_config.save_model_name = args.model_name 
+        
+    if args.tau_weight is not None:
+        # Die IDs für dy2tau
+        dy2tau_keys = (51718, 51719, 51694, 51695, 51697, 51698)
+        
+        # Da das Dictionary durch __post_init__ schon abgeflacht wurde,
+        # liegen die IDs jetzt direkt als Keys vor. Wir überschreiben sie einfach.
+        for process_id in dy2tau_keys:
+            full_config.training_config.sub_process_ratios[process_id] = args.tau_weight
+
+    # 3. SEED SETZEN (Passiert jetzt NACHDEM die Config überschrieben wurde)
+    torch.manual_seed(full_config.training_config.seed)
+    np.random.seed(full_config.training_config.seed)
+    
+    # 4. main() aufrufen (main bedient sich nun der geupdateten full_config)
     main(
-        ignore_cache=parser.args.ignore_cache,
-        save_cache=parser.args.save_cache,
-        tensorboard_name=parser.args.tensorboard_name
+        ignore_cache=args.ignore_cache,
+        save_cache=args.save_cache,
+        tensorboard_name=args.tensorboard_name
+    )
 
-        )
+
+
+
+
+# if __name__ == "__main__":
+#     from utils.parser import ParserBuilder
+#     parser = ParserBuilder("tensorboard", "cache")
+
+#     # call main with parsed args
+#     main(
+#         ignore_cache=parser.args.ignore_cache,
+#         save_cache=parser.args.save_cache,
+#         tensorboard_name=parser.args.tensorboard_name
+
+#         )
 
 

@@ -135,7 +135,6 @@ def evaluate_model_on_fold(
                     dnn_scores[fold][uid]["eventweights"] = events[uid]["product_of_weights"][idx]*events[uid]["normalization_weights"][idx] # selbst hinzugefügt
 
             del uid_scores
-        from IPython import embed; embed(header="MESSAGE Line 131 | File: evaluate.py")
         return dnn_scores
 
 
