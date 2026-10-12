@@ -1,3 +1,4 @@
+from __future__ import annotations
 from collections import defaultdict
 
 import torch
@@ -123,8 +124,8 @@ class Process(t_data.Dataset):
             chunks.append(picked_indices)
             self.current_idx +=take
             remaining -= take
-        
-        
+
+
         idx = chunks[0] if len(chunks) == 1 else torch.cat(chunks)
 
         # sample events from sample_from, and normalization weight per default
@@ -169,7 +170,7 @@ class Process(t_data.Dataset):
 
 
 class ProcessSampler(t_data.Sampler):
-    signal_background_map = {"hh": "signal", "tt":"background", "dy":"background"}
+    signal_background_map = {"hh": "signal", "tt":"background", "dy":"background", "dysplit":"background"}
 
     def __init__(
         self,
@@ -505,6 +506,40 @@ class ProcessSampler(t_data.Sampler):
                 return collector
 
             setattr(self, attr, _accesor)
+
+    def merged_relative_weights(self, sample_ratio: dict[str, float], merge: dict[str, str] | None = None) -> dict:
+        """
+        Relative weight per process id, as if the process types in *merge* were part of another process type.
+
+        Intention: the 4 node use case splits dysplit off dy, which changes the batch composition and thereby the
+        weights of the normalization statistics. Merging dysplit back into dy and using the 3 node *sample_ratio*
+        reproduces exactly the weights of the 3 node use case (with an empty *merge* this equals relative_weight()).
+
+        Args:
+            sample_ratio (dict[str, float]): Share of each (merged) process type in the batch
+            merge (dict[str, str], optional): Maps a process type to the type it is merged into, e.g. {"dysplit": "dy"}.
+
+        Returns:
+            dict: Relative weight per process id
+        """
+        merge = {} if merge is None else merge
+        group_of = lambda process_type: merge.get(process_type, process_type)  # noqa: E731
+
+        # total weight of a (merged) group, includes the sub sample ratio just like calculate_sample_size
+        totals = defaultdict(float)
+        for process_type, processes in self.process_inst.items():
+            for pid, proc in processes.items():
+                whole_sum = proc.weights_statistics["normalization_weights"]["whole_sum"]
+                totals[group_of(process_type)] += whole_sum * self.sub_sample_ratio.get(pid, 1)
+
+        weights = {}
+        for process_type, processes in self.process_inst.items():
+            group = group_of(process_type)
+            for pid, proc in processes.items():
+                whole_sum = proc.weights_statistics["normalization_weights"]["whole_sum"]
+                weights[pid] = whole_sum / totals[group] * sample_ratio[group]
+        return weights
+
 
     def share_weights_between_sampler(self, process_sampler):
         # helper to enable ex. validation sampler to get sampling weight from training sampler

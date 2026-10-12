@@ -48,7 +48,12 @@ def main(**kwargs):
         # load data from cache is necessary or from root files
         # events is of form : {uid : {"continuous","categorical", "weight": torch tensor}}
         events = load_data.get_data(full_config.dataset_config, ignore_cache=kwargs["ignore_cache"], _save_cache=kwargs["save_cache"])
+
+        # 4 node use case: carve the dysplit pids out of dy, before anything keyed by uid is built
+        if full_config.dataset_config.use_dysplit:
+            events = preprocessing.relabel_dysplit(events, full_config.dataset_config.dysplit_pids)
         # split data into training and validation according to fold and get collect all weight statistics
+
         fold_split_coordinator = preprocessing.FoldAndSplitCoordinator(
             events=events,
             c_fold=current_fold,
@@ -76,7 +81,7 @@ def main(**kwargs):
             "sample_ratio" : full_config.training_config.sample_ratio,
             "sub_sample_ratio" : full_config.training_config.sub_process_ratios,
         }
-        
+
         training_sampler = sampler.create_sampler(
             train_events,
             train=True,
@@ -92,12 +97,19 @@ def main(**kwargs):
         training_sampler.share_weights_between_sampler(validation_sampler)
         # get weighted mean and std of expected batch composition
         logger_inst.info("Start model building and configuration")
+        # dysplit is merged back into dy and the 3 node ratio is used, so mean/std are identical in both use cases
+
+
 
         full_config.model_building_config.mean, full_config.model_building_config.std = preprocessing.get_batch_statistics_from_sampler(
             training_sampler,
             padding_values=full_config.dataset_config.dummy_values,
             features=full_config.dataset_config.continuous_features,
             return_dummy=full_config.debug_config.get_batch_statistic_return_dummy,
+            weights_dict=training_sampler.merged_relative_weights(
+                sample_ratio=full_config.stats_sample_ratio,
+                merge={"dysplit": "dy"},
+            ),
         )
         #----
         ### model build and configuration, including optimizer, scheduler, early stopping and loss function
@@ -111,13 +123,15 @@ def main(**kwargs):
         training_loss_inst, validation_loss_inst = init_loss(full_config=full_config, device=DEVICE, training_sampler=training_sampler)
         scheduler_inst = init_scheduler(full_config=full_config, optimizer_inst=optimizer_inst)
         checkpoint_inst = CheckPoint(checkpoint_name=full_config.training_config.save_model_name, checkpoint_fold=current_fold)
-        
+
         from src.optimizer.scheduler_handler import SchedulerHandler
 
         scheduler_handler_inst = SchedulerHandler(scheduler_inst=scheduler_inst, checkpoint_inst=checkpoint_inst, logger_inst=logger_inst)
         #----
         ### training loop
         #----
+
+        from IPython import embed; embed(header="MESSAGE Line 134 | File: /afs/desy.de/user/w/wiedersb/xxl/Vincent/src/train/train.py")
         logger_inst.info("Start training loop")
         last_losses = deque([10, 10, 10, 10, 10, 10, 10, 10, 10, 10], maxlen = 10)
         for current_iteration in range(1_000_000):
@@ -152,7 +166,7 @@ def main(**kwargs):
                     sample_columns=full_config.training_config.sample_attributes,
                     device=DEVICE
                     )
-                
+
                 eval_t_pred = torch.nn.functional.softmax(eval_t_pred, dim=1)
 
                 if full_config.training_config.log_metrics:
@@ -170,7 +184,7 @@ def main(**kwargs):
                         # kernels = model_inst.binning_layer.kernels,
                         dataset_id = eval_t_dataset_id,
                     )
-                
+
                 ##########mein code endet hier
 
 
@@ -186,7 +200,7 @@ def main(**kwargs):
                 #     sample_columns=full_config.training_config.sample_attributes,
                 #     device=DEVICE
                 #     )
-                
+
                 # eval_t_pred = torch.nn.functional.softmax(eval_t_pred, dim=1)
                 # TODO when edges should be tracked add this in a way that is universal and does not break for models without binning layer, e.g. add property to model that returns None if no binning layer is present and add check in log_metrics
                 # evaluation of validation
@@ -199,7 +213,7 @@ def main(**kwargs):
                     sample_columns=full_config.training_config.sample_attributes,
                     device=DEVICE
                     )
-                
+
                 eval_v_pred = torch.nn.functional.softmax(eval_v_pred, dim=1)
 
                 # TODO when edges should be tracked add this in a way that is universal and does not break for models without binning layer, e.g. add property to model that returns None if no binning layer is present and add check in log_metrics
@@ -250,7 +264,7 @@ def main(**kwargs):
                     )
 
                 if optimizer_inst.param_groups[0]["lr"] <= scheduler_inst.min_lrs[0]:
-                    break           
+                    break
 
 
                 scheduler_handler_inst.step(model_inst, optimizer_inst, metric=eval_v_loss)
@@ -276,7 +290,7 @@ def main(**kwargs):
                 #         optimizer_inst.param_groups[0]["lr"] = current_lr
 
 
-            
+
 
 #        from IPython import embed
 #        embed(header="Training ends: Check if everything is as you thought it would be")
@@ -292,14 +306,14 @@ if __name__ == "__main__":
     # 2. Config mit CLI-Argumenten überschreiben (falls in CLI angegeben)
     if args.seed is not None:
         full_config.training_config.seed = args.seed
-        
+
     if args.model_name is not None:
-        full_config.training_config.save_model_name = args.model_name 
-        
+        full_config.training_config.save_model_name = args.model_name
+
     if args.tau_weight is not None:
         # Die IDs für dy2tau
         dy2tau_keys = (51718, 51719, 51694, 51695, 51697, 51698)
-        
+
         # Da das Dictionary durch __post_init__ schon abgeflacht wurde,
         # liegen die IDs jetzt direkt als Keys vor. Wir überschreiben sie einfach.
         for process_id in dy2tau_keys:
@@ -308,7 +322,6 @@ if __name__ == "__main__":
     # 3. SEED SETZEN (Passiert jetzt NACHDEM die Config überschrieben wurde)
     torch.manual_seed(full_config.training_config.seed)
     np.random.seed(full_config.training_config.seed)
-    # print(torch.normal(0, 1, size=(5,)))
 
     # 4. main() aufrufen (main bedient sich nun der geupdateten full_config)
     main(
@@ -332,5 +345,3 @@ if __name__ == "__main__":
 #         tensorboard_name=parser.args.tensorboard_name
 
 #         )
-
-

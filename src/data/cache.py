@@ -18,6 +18,11 @@ class DataCacher():
     def __init__(self, config):
         if dataclasses.is_dataclass(config):
             config = dataclasses.asdict(config)
+
+        # splits should not alter the cache
+        # trigger a full reload from the root files.
+        config = {k: v for k, v in config.items() if k not in ("use_dysplit", "dysplit_pids")}
+        config["target_map"] = {"hh": 0, "tt": 1, "dy": 2}
         self.path = self.cache_dir(config)
 
     def cache_dir(self, config):

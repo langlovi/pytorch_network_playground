@@ -289,7 +289,7 @@ class ResidualDNN(BaseModel):
         self.resnet_block_1 = layers.ResNetPreactivationBlock(**cfg)
         self.resnet_block_2 = layers.ResNetPreactivationBlock(**cfg)
         self.resnet_block_3 = layers.ResNetPreactivationBlock(**cfg)
-        self.last_linear = torch.nn.Linear(self.model_building_config.nodes, 3)
+        self.last_linear = torch.nn.Linear(self.model_building_config.nodes, len(self.dataset_config.target_map))
 
     def forward(self, categorical_inputs, continuous_inputs):
         x = self.input_layer(categorical_inputs=categorical_inputs, continuous_inputs=continuous_inputs)

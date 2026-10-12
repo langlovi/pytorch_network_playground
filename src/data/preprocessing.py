@@ -81,6 +81,39 @@ class WeightAggregator():
         return self.sum_weights_over(kind_weight, phase_space)
 
 
+def relabel_dysplit(events: dict, dysplit_pids: tuple[int, ...]) -> dict:
+    """
+    Moves all dy processes with a pid in *dysplit_pids* into their own process type "dysplit".
+
+    The sampler treats every process type as one node with its own share of the batch.
+    Relabeling the uid from ("dy", pid) to ("dysplit", pid) is therefore all that is needed:
+    the pids vanish from dy and show up in dysplit. Must run before the fold split and the WeightAggregator,
+    since both are keyed by uid.
+    WeightAggregator.identify_pid works on the pid alone, so dysplit still counts as dy background in the yields.
+
+    Args:
+        events (dict): Events of the form {(process_type, pid): {...}}
+        dysplit_pids (tuple[int, ...]): Process ids that belong to dysplit
+
+    Raises:
+        ValueError: If no dy process matches, which would leave the dysplit node without any events.
+
+    Returns:
+        dict: The same dict, with the matching uids relabeled
+    """
+    moved = []
+    for uid in list(events.keys()):
+        process_type, pid = uid
+        if process_type == "dy" and pid in dysplit_pids:
+            events[("dysplit", pid)] = events.pop(uid)
+            moved.append(pid)
+
+    if not moved:
+        raise ValueError(f"None of the dysplit pids {dysplit_pids} was found in the dy events, the dysplit node would be empty.")
+    logger_inst.info(f"Moved {len(moved)} pids from dy to dysplit: {sorted(moved)}")
+    return events
+
+
 class FoldAndSplitCoordinator():
     def __init__(self, events: dict[torch.Tensor], c_fold: int, k_fold: int, training_percentage: float, seed: int=0, randomize: bool=True):
         """
@@ -254,7 +287,7 @@ def map_categorical_features(expected_inputs, feature_array, categorical_feature
             feature_array[:, idx][mask] = new_value
     return feature_array
 
-def get_batch_statistics_from_sampler(sampler=None, padding_values=None, features=None, return_dummy=False):
+def get_batch_statistics_from_sampler(sampler=None, padding_values=None, features=None, return_dummy=False, weights_dict=None):
     """
     Calculates the weighted mean and standard deviation over all subphase spaces of a process in *sampler*.
     The data is expected to be of form : {"unique_identifier_tuple": {continuous: arr}, {weight}: arr}.
@@ -267,6 +300,7 @@ def get_batch_statistics_from_sampler(sampler=None, padding_values=None, feature
         sampler (dict): Dictionary over datasets
         padding_values (int, optional): List of padding_values per feature, or single value. Padding value are ignored in the calculation of the statitics. Defaults to None, which means no padding.
         return_dummy (bool): Return dummy values that describe Identity transformation. This does not compute the statistics, and are a good option when one load pretrained weights anyway.
+        weights_dict (dict, optional): Weight per process id of the weighted average. Defaults to the relative weights of the sampler.
     """
     # when only dummy values for init are necessary return mean = 0 and std as 1
     if return_dummy:
@@ -284,7 +318,7 @@ def get_batch_statistics_from_sampler(sampler=None, padding_values=None, feature
     weighted_means = []
     weighted_vars = []
     features_dict = sampler.continuous()
-    weights_dict = sampler.relative_weight()
+    weights_dict = sampler.relative_weight() if weights_dict is None else weights_dict
     sum_of_weights = sum(list(weights_dict.values()))
     # for each process id calculate weighted mean, std for each feature representing batch statistics
     for current_pid_idx, pid in enumerate(features_dict.keys(), start = 1):

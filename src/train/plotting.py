@@ -223,7 +223,9 @@ def network_predictions_hh(y_true, y_pred, target_map, binning_edges, normalize,
     masks = {process: (y_true[:, idx] == 1) for process, idx in target_map.items()}
     # to get node information apply index filtering on PREDICTION
     hh_node = {process: y_pred[masks[process]][:, signal_idx] for process, idx in target_map.items()}
-    hh_node["background"] = np.concatenate([hh_node["dy"], hh_node["tt"]], axis=0)
+
+    # background is everything that is not hh, so dysplit is included automatically in the 4 node use case
+    hh_node["background"] = np.concatenate([hh_node[process] for process in target_map if process != "hh"], axis=0)
 
     # number of events are not evenly distributed outside of sampler
     # normalize is a factor that also shows up in the legend
@@ -290,6 +292,20 @@ def network_predictions_hh(y_true, y_pred, target_map, binning_edges, normalize,
             hatch="*",
             **kwargs,
             )
+
+    # only exists in the 4 node use case
+    if "dysplit" in hh_node:
+        _ = axes[2].hist(
+                hh_node["dysplit"],
+                bins=binning_edges,
+                histtype=kwargs.get("histtype", "step"),
+                alpha=kwargs.get("alpha", 0.7),
+                label="dysplit",
+                weights=weights["dysplit"],
+                hatch="+",
+                **kwargs,
+                )
+
 
     # settings
     for ax in axes:
@@ -534,7 +550,3 @@ def hist_test(y_true, y_pred, target_map, normalize=True, single_legend=False, *
     return fig, axes
 
 #plot in train.py aufrufen
-
-
-
-

@@ -24,10 +24,23 @@ SCHEDULER_CHOICE = Literal["linear", "cosine_annealing", "reduce_on_plateau", "s
 
 
 
+# 4 node use case (hh, tt, dy, dysplit), only active when DataConfig.use_dysplit is True
+DYSPLIT_TARGET_MAP = {"hh": 0, "tt": 1, "dy": 2, "dysplit": 3}
+DYSPLIT_SAMPLE_RATIO = {"hh": 1 / 4, "tt": 1 / 4, "dy": 1 / 4, "dysplit": 1 / 4}
+
+
 @dataclass
 class DataConfig:
     # changes in this config will create a NEW hash of the data
-    target_map: Dict[str, int] = field(default_factory=lambda: {"hh": 0, "tt": 1, "dy": 2}) # node: index
+    # HINT: use_dysplit, dysplit_pids and target_map are excluded from the hash (see DataCacher),
+    # because the cached events do not depend on them -> 3 and 4 node share one cache
+    target_map: Dict[str, int] = field(default_factory=lambda: {"hh": 0, "tt": 1, "dy": 2}) # node: index, overwritten when use_dysplit is True
+
+    use_dysplit: bool = True # switch between the two use cases: False = 3 nodes (hh, tt, dy), True = 4 nodes (hh, tt, dy, dysplit)
+    # process ids that are moved out of dy into the dysplit node
+    # PLACEHOLDER: currently the dy2tau ids, adjust to the real dysplit selection
+    dysplit_pids: Tuple[int, ...] = (51718, 51719, 51694, 51695, 51697, 51698)
+
     continuous_features: List[str] = field(init=False)
     categorical_features: List[str] = field(init=False)
     dataset_pattern: Tuple[str] = (
@@ -36,15 +49,19 @@ class DataConfig:
         "hh_ggf_hbb_htt_kl1_kt1*",
         # "hh_ggf_hbb_htt_kl0_kt1*",
         )
-    eras: Tuple[ERAS_CHOICE] = ("22pre", "22post", "23pre", "23post")
-    # eras: Tuple[ERAS_CHOICE] = ("23pre",)
-        
+    # eras: Tuple[ERAS_CHOICE] = ("22pre", "22post", "23pre", "23post")
+    eras: Tuple[ERAS_CHOICE] = ("23pre",)
+
     datasets: Optional[List[str]] = None
     cuts: Optional[Any] = None
     dummy_values = -99999 # value used to fill in missing values
 
     def __post_init__(self):
         # a dictionary of all files corresponding to a certain dataset
+        # the 4 node use case needs one more output node, everything downstream (model, loops, sampler, plots) reads the size from target_map
+        if self.use_dysplit:
+            self.target_map = dict(DYSPLIT_TARGET_MAP)
+
         self.datasets = find_datasets(self.dataset_pattern, self.eras, file_type="root", verbose=False)
         self.continuous_features = features.continuous_features
         self.categorical_features = features.categorical_features
@@ -147,7 +164,7 @@ class TrainingConfig:
     t_batch_size: int = 4096 * 10
     v_batch_size: int = -1 # validation batch size, -1 = full set,
     save_model_name: str = "test" # name of the model used to save, KEIN PUNKT IM NAMEN!
-    
+
     # Sampler Settings
     sample_ratio: Dict[str, float] = field(default_factory=lambda:{"dy": 1 / 3, "tt": 1 / 3, "hh": 1 / 3}) # decide the ratio of tt, dy and hh within a batch
     sub_process_ratios: Dict[str, float] = field(default_factory=lambda:{ # decide the
@@ -155,7 +172,7 @@ class TrainingConfig:
         "signal":{}, # empty categorizes are set to 1 by default
         "tt":{(1100,1200): 1, 1300: 1}, # groups are possible, and mixes are allowed
         "dy":{51001: 1, 51718: 1, 51719: 1, 51694: 1, 51661: 1, 51677: 1, 51695: 1, 51669: 1, 51685: 1, 51697: 1, 51698: 1, 51662: 1, 51678: 1},
-        
+
         "dy2tau":{(51718, 51719, 51694, 51695, 51697, 51698): 5.0},
         "dy2e":{(51661, 51662, 51669): 1},
         "dy2mu":{(51685, 51677, 51678): 1},
@@ -289,7 +306,18 @@ class FullConfig:
     optimizer_config: OptimizerConfig = field(default_factory=OptimizerConfig)
     debug_config: DebugConfig = field(default_factory=DebugConfig)
 
+    # batch composition used to weight the mean/std of the standardization layer
+    stats_sample_ratio: Dict[str, float] = field(init=False)
+
+
     def __post_init__(self):
+        # must be stored before sample_ratio is overwritten for the 4 node use case
+        self.stats_sample_ratio = dict(self.training_config.sample_ratio)
+
+        # the batch needs a share for the dysplit node, the 3 node sample_ratio would leave it without a key
+        if self.dataset_config.use_dysplit:
+            self.training_config.sample_ratio = dict(DYSPLIT_SAMPLE_RATIO)
+
         # when using optimizer sam specific training routine needs to be used
         if (self.training_config.training_fn != "sam") & (self.optimizer_config.optimizer_choice=="sam"):
             raise ValueError(f"When using Optimizer SAM, training_fn needs to be set to 'sam', is currently:{self.training_config.training_fn}).")
