@@ -24,8 +24,8 @@ CPU = torch.device("cpu")
 CUDA = torch.device("cuda")
 DEVICE = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 
-#torch.manual_seed(full_config.training_config.seed) #entfernt für parser option (06.10.26)
-#np.random.seed(full_config.training_config.seed)       # gleiches hier
+# torch.manual_seed(full_config.training_config.seed) #entfernt für parser option (06.10.26)
+# np.random.seed(full_config.training_config.seed)       # gleiches hier
 
 def main(**kwargs):
     # prepare logger
@@ -278,10 +278,10 @@ def main(**kwargs):
 
             
 
-
-
 #        from IPython import embed
 #        embed(header="Training ends: Check if everything is as you thought it would be")
+
+
 if __name__ == "__main__":
     from utils.parser import ParserBuilder
 
@@ -308,7 +308,8 @@ if __name__ == "__main__":
     # 3. SEED SETZEN (Passiert jetzt NACHDEM die Config überschrieben wurde)
     torch.manual_seed(full_config.training_config.seed)
     np.random.seed(full_config.training_config.seed)
-    
+    # print(torch.normal(0, 1, size=(5,)))
+
     # 4. main() aufrufen (main bedient sich nun der geupdateten full_config)
     main(
         ignore_cache=args.ignore_cache,

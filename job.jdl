@@ -1,12 +1,12 @@
-Executable = /afs/desy.de/user/l/langlovi/pytorch_network_playground/run.sh
+Executable = /afs/desy.de/user/l/langlovi/pytorch_network_playground/run_eval.sh
 
 log    = job_$(Cluster)_$(Process).log
 output = job_$(Cluster)_$(Process).out
 error  = job_$(Cluster)_$(Process).err
 
 Request_OpSysAndVer = "RedHat9"
-+MaxRuntime = 27000
-+RequestRuntime = 10799
++MaxRuntime = 10800
++RequestRuntime = 10800
 RequestMemory = 20.0 Gb
 Request_Memory = 20.0 Gb
 RequestDisk = 6.0 Gb
