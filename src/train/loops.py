@@ -127,7 +127,7 @@ class TrainingLoop(BaseLoop):
         **kwargs,
         ):
         # this loss never uses a binning network thus, a single prediction is expected
-
+        model.train()
         optimizer.zero_grad()
 
         events = sampler.sample_batch(sample_from=self.necessary_columns, device=device)

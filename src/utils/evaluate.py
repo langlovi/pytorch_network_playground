@@ -85,7 +85,7 @@ def evaluate_model_on_fold(
                 k_fold=full_config.training_config.k_fold,
                 seed=full_config.training_config.seed,
                 training_percentage=full_config.training_config.train_ratio,
-                randomize=False,
+                randomize=True,
             )
             # --- run model on specific splits ---
             dnn_scores[fold] = {}

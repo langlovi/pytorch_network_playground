@@ -30,7 +30,7 @@ export CF_USER_FLAVOR="dev" # your cf user name - used when source setup with fo
 export CF_SANDBOX="venv_hbt_dev" #  sandbox name within columnflow
 
 # pyenv or virtualenv settings
-export VENV_ROOT="/data/dust/user/${USER}/venvs" # place to look for existing virtualenvs
+export VENV_ROOT="/data/dust/user/${USER}/venvs"            #"/data/dust/user/wiedersb/pyenv_virtualenvs"   # place to look for existing virtualenvs
 export PYENV_ROOT="/afs/desy.de/user/w/${USER}/.pyenv" # root of pyenv installation
 export ML_ENV="ml_torch" # name of your virtualenv, so it can be activated by source setup.sh
 

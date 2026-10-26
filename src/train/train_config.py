@@ -36,7 +36,7 @@ class DataConfig:
     # because the cached events do not depend on them -> 3 and 4 node share one cache
     target_map: Dict[str, int] = field(default_factory=lambda: {"hh": 0, "tt": 1, "dy": 2}) # node: index, overwritten when use_dysplit is True
 
-    use_dysplit: bool = True # switch between the two use cases: False = 3 nodes (hh, tt, dy), True = 4 nodes (hh, tt, dy, dysplit)
+    use_dysplit: bool = False # switch between the two use cases: False = 3 nodes (hh, tt, dy), True = 4 nodes (hh, tt, dy, dysplit)
     # process ids that are moved out of dy into the dysplit node
     # PLACEHOLDER: currently the dy2tau ids, adjust to the real dysplit selection
     dysplit_pids: Tuple[int, ...] = (51718, 51719, 51694, 51695, 51697, 51698)
@@ -49,8 +49,8 @@ class DataConfig:
         "hh_ggf_hbb_htt_kl1_kt1*",
         # "hh_ggf_hbb_htt_kl0_kt1*",
         )
-    # eras: Tuple[ERAS_CHOICE] = ("22pre", "22post", "23pre", "23post")
-    eras: Tuple[ERAS_CHOICE] = ("23pre",)
+    eras: Tuple[ERAS_CHOICE] = ("22pre", "22post", "23pre", "23post")
+    # eras: Tuple[ERAS_CHOICE] = ("23pre",)
 
     datasets: Optional[List[str]] = None
     cuts: Optional[Any] = None
@@ -159,11 +159,11 @@ class TrainingConfig:
     label_smoothing: float = 0.0
     train_folds: Tuple[int, ...] = (0,) # which training folds to use
     k_fold: int = 5
-    seed: int = 102 #(100 is standard/reference value) set torch and numpy seed for reproducibility
+    seed: int = 100 #(100 is standard/reference value) set torch and numpy seed for reproducibility
     train_ratio: float = 0.75 # split ratio for k-fold data into train and validation
     t_batch_size: int = 4096 * 10
     v_batch_size: int = -1 # validation batch size, -1 = full set,
-    save_model_name: str = "test" # name of the model used to save, KEIN PUNKT IM NAMEN!
+    save_model_name: str = "test"  #B21" # name of the model used to save, KEIN PUNKT IM NAMEN!
 
     # Sampler Settings
     sample_ratio: Dict[str, float] = field(default_factory=lambda:{"dy": 1 / 3, "tt": 1 / 3, "hh": 1 / 3}) # decide the ratio of tt, dy and hh within a batch
@@ -173,7 +173,7 @@ class TrainingConfig:
         "tt":{(1100,1200): 1, 1300: 1}, # groups are possible, and mixes are allowed
         "dy":{51001: 1, 51718: 1, 51719: 1, 51694: 1, 51661: 1, 51677: 1, 51695: 1, 51669: 1, 51685: 1, 51697: 1, 51698: 1, 51662: 1, 51678: 1},
 
-        "dy2tau":{(51718, 51719, 51694, 51695, 51697, 51698): 5.0},
+        "dy2tau":{(51718, 51719, 51694, 51695, 51697, 51698): 1.0},
         "dy2e":{(51661, 51662, 51669): 1},
         "dy2mu":{(51685, 51677, 51678): 1},
     })

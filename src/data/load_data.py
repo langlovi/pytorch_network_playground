@@ -69,8 +69,8 @@ def root_to_numpy(
 
     baseline_cuts = [
         "(leptons_os == 1)",
-        "(reg_dnn_moe_vis_tau2_charge == 1) | (reg_dnn_moe_vis_tau2_charge == -1)",
-        "(reg_dnn_moe_vis_tau1_charge == 1) | (reg_dnn_moe_vis_tau1_charge == -1)",
+        "((reg_dnn_moe_vis_tau2_charge == 1) | (reg_dnn_moe_vis_tau2_charge == -1))",
+        "((reg_dnn_moe_vis_tau1_charge == 1) | (reg_dnn_moe_vis_tau1_charge == -1))",
         "((channel_id == 1) & (num_taus_iso >= 1)) | ((channel_id == 2) & (num_taus_iso >= 1)) | ((channel_id == 3) & (num_taus_iso >= 2))",
         "(vbf_dnn_moe_hh_vbf < 0.5)"]
 

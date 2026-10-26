@@ -52,7 +52,7 @@ def torch_export_pt2(
     categorical_input = torch.zeros(2, num_cat).to(torch.int32).to(DEVICE)
     continuous_inputs = torch.zeros(2, num_cont).to(torch.float32).to(DEVICE)
 
-    dim = torch.export.Dim("batch")
+    dim = torch.export.Dim("batch", min = 2, max = 1_000_000)
     dynamic_shapes = {
         "categorical_inputs": {0:dim, 1:categorical_input.shape[-1]},
         "continuous_inputs" : {0:dim, 1:continuous_inputs.shape[-1]},
@@ -69,7 +69,7 @@ def torch_export_pt2(
         base_dir = os.environ["MODELS_DIR"]
 
     dst = (pathlib.Path(base_dir) / f"{name}_fold{fold}").with_suffix(".pt2")
-    torch.export.save(exp, dst, pickle_protocol=4)
+    torch.export.save(exp, dst)
     return dst
 
 

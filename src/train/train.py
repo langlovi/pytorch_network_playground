@@ -127,11 +127,13 @@ def main(**kwargs):
         from src.optimizer.scheduler_handler import SchedulerHandler
 
         scheduler_handler_inst = SchedulerHandler(scheduler_inst=scheduler_inst, checkpoint_inst=checkpoint_inst, logger_inst=logger_inst)
+        
+        from IPython import embed; embed(header="MESSAGE Line 131 | File: train.py")
         #----
         ### training loop
         #----
 
-        from IPython import embed; embed(header="MESSAGE Line 134 | File: /afs/desy.de/user/w/wiedersb/xxl/Vincent/src/train/train.py")
+
         logger_inst.info("Start training loop")
         last_losses = deque([10, 10, 10, 10, 10, 10, 10, 10, 10, 10], maxlen = 10)
         for current_iteration in range(1_000_000):

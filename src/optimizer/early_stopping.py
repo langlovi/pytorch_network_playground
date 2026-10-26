@@ -8,6 +8,8 @@ import torch
 from utils.logger import get_logger
 from dataclasses import asdict
 
+import copy
+
 logger_inst = get_logger(__name__)
 
 class EarlyStopSignal:
@@ -107,9 +109,9 @@ class CheckPoint:
             "model_cls_module": model.__class__.__module__,
             "model_cls_name": model.__class__.__name__,
             "model_inst" : (None if model.is_parametrized else model), # when using a parametrization model_inst can't be saved, in this case return None
-            "model_state_dict" : model.state_dict().copy(),
+            "model_state_dict" : copy.deepcopy(model.state_dict()),
             "optimizer" : optimizer,
-            "optimizer_state_dict": optimizer.state_dict().copy(),
+            "optimizer_state_dict": copy.deepcopy(optimizer.state_dict()),
             "lr_scheduler": scheduler,
             "iteration": current_iteration,
             "full_config": asdict(full_config),
